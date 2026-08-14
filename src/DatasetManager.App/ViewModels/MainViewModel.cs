@@ -1,0 +1,316 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
+using System.Windows;
+using System.Windows.Data;
+using DatasetManager.App.Views;
+using DatasetManager.Core.Models;
+using DatasetManager.Core.Services;
+using DatasetManager.Native;
+
+namespace DatasetManager.App.ViewModels;
+
+public sealed class MainViewModel : ObservableObject
+{
+    private readonly IDatasetRepository _repository = new JsonDatasetRepository();
+    private readonly DatasetScanner _scanner = new(new NativeImageService());
+    private readonly LabelMeAnnotationScanner _annotationScanner = new();
+    private readonly List<DatasetRecord> _models = [];
+    private DatasetItemViewModel? _selectedDataset;
+    private AnnotationSetRecord? _selectedAnnotationSet;
+    private DatasetType? _filterType;
+    private string _searchText = string.Empty;
+    private string _statusText = "正在载入…";
+
+    public MainViewModel()
+    {
+        DatasetsView = CollectionViewSource.GetDefaultView(Datasets);
+        DatasetsView.Filter = FilterDataset;
+        AddCommand = new RelayCommand(AddDataset);
+        EditCommand = new RelayCommand(EditDataset, () => SelectedDataset is not null);
+        RemoveCommand = new AsyncRelayCommand(RemoveDatasetAsync, () => SelectedDataset is not null);
+        RefreshCommand = new AsyncRelayCommand(RefreshSelectedAsync, () => SelectedDataset is not null);
+        OpenFolderCommand = new RelayCommand(OpenSelectedFolder, () => SelectedDataset is not null);
+        AddAnnotationCommand = new RelayCommand(AddAnnotationSet, CanAddAnnotationSet);
+        EditAnnotationCommand = new RelayCommand(EditAnnotationSet, () => SelectedAnnotationSet is not null);
+        RemoveAnnotationCommand = new AsyncRelayCommand(RemoveAnnotationSetAsync, () => SelectedAnnotationSet is not null);
+        RefreshAnnotationCommand = new AsyncRelayCommand(RefreshAnnotationSetAsync, () => SelectedAnnotationSet is not null);
+        _ = LoadAsync();
+    }
+
+    public ObservableCollection<DatasetItemViewModel> Datasets { get; } = [];
+    public ICollectionView DatasetsView { get; }
+    public RelayCommand AddCommand { get; }
+    public RelayCommand EditCommand { get; }
+    public AsyncRelayCommand RemoveCommand { get; }
+    public AsyncRelayCommand RefreshCommand { get; }
+    public RelayCommand OpenFolderCommand { get; }
+    public RelayCommand AddAnnotationCommand { get; }
+    public RelayCommand EditAnnotationCommand { get; }
+    public AsyncRelayCommand RemoveAnnotationCommand { get; }
+    public AsyncRelayCommand RefreshAnnotationCommand { get; }
+    public string NativeStatus { get; } = new NativeImageService().GetNativeVersion();
+
+    public DatasetItemViewModel? SelectedDataset
+    {
+        get => _selectedDataset;
+        set
+        {
+            if (!SetProperty(ref _selectedDataset, value)) return;
+            EditCommand.RaiseCanExecuteChanged();
+            RemoveCommand.RaiseCanExecuteChanged();
+            RefreshCommand.RaiseCanExecuteChanged();
+            OpenFolderCommand.RaiseCanExecuteChanged();
+            SelectedAnnotationSet = value?.AnnotationSets.FirstOrDefault();
+            AddAnnotationCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    public AnnotationSetRecord? SelectedAnnotationSet
+    {
+        get => _selectedAnnotationSet;
+        set
+        {
+            if (!SetProperty(ref _selectedAnnotationSet, value)) return;
+            EditAnnotationCommand.RaiseCanExecuteChanged();
+            RemoveAnnotationCommand.RaiseCanExecuteChanged();
+            RefreshAnnotationCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    public string SearchText
+    {
+        get => _searchText;
+        set
+        {
+            if (SetProperty(ref _searchText, value)) DatasetsView.Refresh();
+        }
+    }
+
+    public string StatusText
+    {
+        get => _statusText;
+        private set => SetProperty(ref _statusText, value);
+    }
+
+    public int RawCount => _models.Count(x => x.Type == DatasetType.Raw);
+    public int ProcessedCount => _models.Count(x => x.Type == DatasetType.Processed);
+    public int TestCount => _models.Count(x => x.Type == DatasetType.Test);
+    public int ValidationCount => _models.Count(x => x.Type == DatasetType.Validation);
+
+    public void SetFilter(DatasetType? type)
+    {
+        _filterType = type;
+        DatasetsView.Refresh();
+        StatusText = type switch
+        {
+            DatasetType.Raw => "原始数据集",
+            DatasetType.Processed => "已处理数据集",
+            DatasetType.Test => "测试集",
+            DatasetType.Validation => "验证集",
+            _ => "全部数据集"
+        };
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _models.AddRange(await _repository.LoadAsync());
+            RebuildItems();
+            StatusText = $"已载入 {_models.Count} 个数据集";
+        }
+        catch (Exception exception)
+        {
+            StatusText = "载入失败";
+            MessageBox.Show(exception.Message, "无法载入目录库", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void AddDataset()
+    {
+        var dialog = new DatasetEditorWindow(_models, null) { Owner = Application.Current.MainWindow };
+        if (dialog.ShowDialog() != true || dialog.Result is null) return;
+
+        dialog.Result.ChangeHistory.Add(new DatasetChangeEntry
+        {
+            Description = string.IsNullOrWhiteSpace(dialog.ChangeDescription) ? "创建数据集记录" : dialog.ChangeDescription
+        });
+        _models.Add(dialog.Result);
+        RebuildItems(dialog.Result.Id);
+        _ = SaveAndScanAsync(dialog.Result);
+    }
+
+    private void EditDataset()
+    {
+        if (SelectedDataset is null) return;
+        var model = SelectedDataset.Model;
+        var dialog = new DatasetEditorWindow(_models, model) { Owner = Application.Current.MainWindow };
+        if (dialog.ShowDialog() != true || dialog.Result is null) return;
+
+        model.Name = dialog.Result.Name;
+        model.Type = dialog.Result.Type;
+        model.RootPath = dialog.Result.RootPath;
+        model.ParentDatasetId = dialog.Result.ParentDatasetId;
+        model.Notes = dialog.Result.Notes;
+        model.UpdatedAt = DateTimeOffset.Now;
+        model.ChangeHistory.Add(new DatasetChangeEntry
+        {
+            Description = string.IsNullOrWhiteSpace(dialog.ChangeDescription) ? "更新数据集信息" : dialog.ChangeDescription
+        });
+        RebuildItems(model.Id);
+        _ = SaveAndScanAsync(model);
+    }
+
+    private async Task RemoveDatasetAsync()
+    {
+        if (SelectedDataset is null) return;
+        var model = SelectedDataset.Model;
+        var children = _models.Count(x => x.ParentDatasetId == model.Id);
+        var suffix = children > 0 ? $"\n\n有 {children} 个派生数据集会解除源数据集关联。" : string.Empty;
+        if (MessageBox.Show($"只删除“{model.Name}”的管理记录，不会删除磁盘文件。{suffix}", "确认移除",
+                MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
+
+        foreach (var child in _models.Where(x => x.ParentDatasetId == model.Id)) child.ParentDatasetId = null;
+        _models.Remove(model);
+        RebuildItems();
+        await SaveAsync();
+    }
+
+    private async Task RefreshSelectedAsync()
+    {
+        if (SelectedDataset is not null) await SaveAndScanAsync(SelectedDataset.Model);
+    }
+
+    private bool CanAddAnnotationSet() => SelectedDataset?.Model.Type == DatasetType.Processed;
+
+    private void AddAnnotationSet()
+    {
+        if (!CanAddAnnotationSet() || SelectedDataset is null) return;
+        var dialog = new AnnotationEditorWindow(null) { Owner = Application.Current.MainWindow };
+        if (dialog.ShowDialog() != true || dialog.Result is null) return;
+
+        var model = SelectedDataset.Model;
+        model.AnnotationSets ??= [];
+        model.AnnotationSets.Add(dialog.Result);
+        model.UpdatedAt = DateTimeOffset.Now;
+        model.ChangeHistory.Add(new DatasetChangeEntry { Description = $"添加标注批次：{dialog.Result.Name}" });
+        SelectedAnnotationSet = dialog.Result;
+        RebuildItems(model.Id);
+        SelectedAnnotationSet = dialog.Result;
+        _ = ScanAndSaveAnnotationAsync(model, dialog.Result);
+    }
+
+    private void EditAnnotationSet()
+    {
+        if (SelectedDataset is null || SelectedAnnotationSet is null) return;
+        var annotation = SelectedAnnotationSet;
+        var dialog = new AnnotationEditorWindow(annotation) { Owner = Application.Current.MainWindow };
+        if (dialog.ShowDialog() != true || dialog.Result is null) return;
+
+        annotation.Name = dialog.Result.Name;
+        annotation.LabelPath = dialog.Result.LabelPath;
+        annotation.Notes = dialog.Result.Notes;
+        annotation.UpdatedAt = DateTimeOffset.Now;
+        var model = SelectedDataset.Model;
+        model.UpdatedAt = DateTimeOffset.Now;
+        model.ChangeHistory.Add(new DatasetChangeEntry { Description = $"更新标注批次：{annotation.Name}" });
+        RebuildItems(model.Id);
+        SelectedAnnotationSet = annotation;
+        _ = ScanAndSaveAnnotationAsync(model, annotation);
+    }
+
+    private async Task RemoveAnnotationSetAsync()
+    {
+        if (SelectedDataset is null || SelectedAnnotationSet is null) return;
+        var annotation = SelectedAnnotationSet;
+        if (MessageBox.Show($"移除标注批次“{annotation.Name}”？只删除管理记录，不删除标签文件。", "确认移除",
+                MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
+
+        var model = SelectedDataset.Model;
+        model.AnnotationSets.Remove(annotation);
+        model.UpdatedAt = DateTimeOffset.Now;
+        model.ChangeHistory.Add(new DatasetChangeEntry { Description = $"移除标注批次：{annotation.Name}" });
+        SelectedAnnotationSet = null;
+        RebuildItems(model.Id);
+        await SaveAsync();
+    }
+
+    private async Task RefreshAnnotationSetAsync()
+    {
+        if (SelectedDataset is not null && SelectedAnnotationSet is not null)
+            await ScanAndSaveAnnotationAsync(SelectedDataset.Model, SelectedAnnotationSet);
+    }
+
+    private async Task ScanAndSaveAnnotationAsync(DatasetRecord dataset, AnnotationSetRecord annotation)
+    {
+        StatusText = $"正在读取标注批次 {annotation.Name}…";
+        annotation.Statistics = await _annotationScanner.ScanAsync(annotation.LabelPath, dataset.RootPath);
+        annotation.UpdatedAt = DateTimeOffset.Now;
+        await SaveAsync();
+        RebuildItems(dataset.Id);
+        SelectedAnnotationSet = annotation;
+        StatusText = annotation.Statistics.ScanError ??
+            $"{annotation.Name}：{annotation.Statistics.JsonFileCount} 个 JSON，{annotation.Statistics.AnnotationCount} 个标注实例，{annotation.Statistics.ClassCounts.Count} 类";
+    }
+
+    private void OpenSelectedFolder()
+    {
+        var rootPath = SelectedDataset?.RootPath;
+        if (rootPath is null || !Directory.Exists(rootPath))
+        {
+            MessageBox.Show("数据集目录不存在。", "无法打开", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        Process.Start(new ProcessStartInfo("explorer.exe", rootPath) { UseShellExecute = true });
+    }
+
+    private async Task SaveAndScanAsync(DatasetRecord model)
+    {
+        StatusText = $"正在扫描 {model.Name}…";
+        model.Statistics = await _scanner.ScanAsync(model.RootPath);
+        var item = Datasets.FirstOrDefault(x => x.Id == model.Id);
+        item?.RefreshAll();
+        await SaveAsync();
+        StatusText = model.Statistics.ScanError is null
+            ? $"{model.Name}：{model.Statistics.ImageCount} 张图片"
+            : $"{model.Name}：{model.Statistics.ScanError}";
+    }
+
+    private async Task SaveAsync()
+    {
+        try { await _repository.SaveAsync(_models); }
+        catch (Exception exception)
+        {
+            MessageBox.Show(exception.Message, "保存失败", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private bool FilterDataset(object item)
+    {
+        if (item is not DatasetItemViewModel dataset) return false;
+        if (_filterType is not null && dataset.Model.Type != _filterType) return false;
+        if (string.IsNullOrWhiteSpace(SearchText)) return true;
+        return dataset.Name.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+               || dataset.RootPath.Contains(SearchText, StringComparison.OrdinalIgnoreCase)
+               || dataset.Notes.Contains(SearchText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string ResolveParentName(Guid? id) =>
+        id is null ? "—" : _models.FirstOrDefault(x => x.Id == id)?.Name ?? "来源已移除";
+
+    private void RebuildItems(Guid? selectedId = null)
+    {
+        selectedId ??= SelectedDataset?.Id;
+        Datasets.Clear();
+        foreach (var model in _models.OrderByDescending(x => x.UpdatedAt))
+            Datasets.Add(new DatasetItemViewModel(model, ResolveParentName));
+        SelectedDataset = Datasets.FirstOrDefault(x => x.Id == selectedId) ?? Datasets.FirstOrDefault();
+        DatasetsView.Refresh();
+        RaisePropertyChanged(nameof(RawCount));
+        RaisePropertyChanged(nameof(ProcessedCount));
+        RaisePropertyChanged(nameof(TestCount));
+        RaisePropertyChanged(nameof(ValidationCount));
+    }
+}

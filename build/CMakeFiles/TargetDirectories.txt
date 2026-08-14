@@ -1,0 +1,4 @@
+D:/Dataset_management/build/CMakeFiles/DatasetManager.Wpf.dir
+D:/Dataset_management/build/CMakeFiles/ALL_BUILD.dir
+D:/Dataset_management/build/CMakeFiles/ZERO_CHECK.dir
+D:/Dataset_management/build/native/CMakeFiles/DatasetManager.OpenCvNative.dir

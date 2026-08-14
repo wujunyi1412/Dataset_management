@@ -1,0 +1,24 @@
+^D:\DATASET_MANAGEMENT\BUILD\CMAKEFILES\AD73134D3B8655DE60271EE18359DA85\DATASETMANAGER.WPF.RULE
+setlocal
+cd D:\Dataset_management
+if %errorlevel% neq 0 goto :cmEnd
+D:
+if %errorlevel% neq 0 goto :cmEnd
+"C:\Program Files\dotnet\dotnet.exe" build D:/Dataset_management/src/DatasetManager.App/DatasetManager.App.csproj --configuration Release --output D:/Dataset_management/bin/Release
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^D:\DATASET_MANAGEMENT\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/Dataset_management -BD:/Dataset_management/build --check-stamp-file D:/Dataset_management/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

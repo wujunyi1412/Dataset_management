@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"D:/Dataset_management/build/cmake_install.cmake",
+		"D:/Dataset_management/build/native/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

@@ -1,0 +1,6 @@
+bin/
+obj/
+.vs/
+native/build*/
+*.user
+*.suo

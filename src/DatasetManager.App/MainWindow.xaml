@@ -1,0 +1,244 @@
+<Window x:Class="DatasetManager.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Dataset Manager" Width="1280" Height="780" MinWidth="1050" MinHeight="650"
+        WindowStartupLocation="CenterScreen" WindowState="Maximized" Background="{StaticResource BackgroundBrush}">
+    <Window.Resources>
+        <Style x:Key="NavigationToggleStyle" TargetType="ToggleButton">
+            <Setter Property="Foreground" Value="#D1D5DB"/>
+            <Setter Property="Background" Value="#1F2937"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Padding" Value="14,9"/>
+            <Setter Property="Margin" Value="0,3"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#374151"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter Property="Background" Value="#2563EB"/>
+                    <Setter Property="Foreground" Value="White"/>
+                    <Setter Property="FontWeight" Value="SemiBold"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+    <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="30"/></Grid.RowDefinitions>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="230"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+
+        <Border Grid.RowSpan="2" Background="#111827">
+            <DockPanel Margin="18,24">
+                <StackPanel DockPanel.Dock="Top">
+                    <TextBlock Text="DATASET" Foreground="#93C5FD" FontSize="12" FontWeight="Bold"/>
+                    <TextBlock Text="数据集管理" Foreground="White" FontSize="22" FontWeight="SemiBold" Margin="0,4,0,28"/>
+                    <ToggleButton x:Name="AllNavigation" Content="全部数据集" Style="{StaticResource NavigationToggleStyle}" IsChecked="True" Click="All_Click"/>
+                    <ToggleButton x:Name="RawNavigation" Style="{StaticResource NavigationToggleStyle}" Click="Raw_Click">
+                        <TextBlock><Run Text="原始数据集  "/><Run Text="{Binding RawCount, Mode=OneWay}"/></TextBlock>
+                    </ToggleButton>
+                    <ToggleButton x:Name="ProcessedNavigation" Style="{StaticResource NavigationToggleStyle}" Click="Processed_Click">
+                        <TextBlock><Run Text="已处理数据集  "/><Run Text="{Binding ProcessedCount, Mode=OneWay}"/></TextBlock>
+                    </ToggleButton>
+                    <ToggleButton x:Name="TestNavigation" Style="{StaticResource NavigationToggleStyle}" Click="Test_Click">
+                        <TextBlock><Run Text="测试集  "/><Run Text="{Binding TestCount, Mode=OneWay}"/></TextBlock>
+                    </ToggleButton>
+                    <ToggleButton x:Name="ValidationNavigation" Style="{StaticResource NavigationToggleStyle}" Click="Validation_Click">
+                        <TextBlock><Run Text="验证集  "/><Run Text="{Binding ValidationCount, Mode=OneWay}"/></TextBlock>
+                    </ToggleButton>
+                </StackPanel>
+                <TextBlock DockPanel.Dock="Bottom" Text="只登记目录，不改动文件" Foreground="#9CA3AF" FontSize="12" TextWrapping="Wrap"/>
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Column="1" Margin="26,22,26,16">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="360"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="数据集目录" FontSize="26" FontWeight="SemiBold" Foreground="#111827"/>
+                    <TextBlock Text="管理来源、用途和每一次修改" Foreground="#6B7280" Margin="0,3,0,0"/>
+                </StackPanel>
+                <TextBox Grid.Column="1" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
+                         Margin="12,0" ToolTip="搜索名称、路径或备注"/>
+                <Button Grid.Column="2" Content="＋ 添加数据集" Command="{Binding AddCommand}" VerticalAlignment="Center"
+                        Background="{StaticResource PrimaryBrush}" Foreground="White"/>
+            </Grid>
+
+            <Grid Grid.Row="1" Margin="0,22,0,0">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="1.15*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="0.85*"/></Grid.ColumnDefinitions>
+                <Border Background="White" CornerRadius="8" Padding="8">
+                    <ListBox ItemsSource="{Binding DatasetsView}" SelectedItem="{Binding SelectedDataset}" BorderThickness="0" Background="Transparent">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Padding" Value="12"/><Setter Property="Margin" Value="0,2"/>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" Foreground="#111827"/>
+                                        <TextBlock Text="{Binding RootPath}" Foreground="#6B7280" TextTrimming="CharacterEllipsis" Margin="0,4,0,5"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding TypeName}" Foreground="#2563EB" Margin="0,0,14,0"/>
+                                            <TextBlock Text="{Binding ImageSummary}" Foreground="#4B5563" Margin="0,0,14,0"/>
+                                            <TextBlock Text="{Binding AnnotationSummary}" Foreground="#7C3AED"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="›" FontSize="24" Foreground="#9CA3AF" VerticalAlignment="Center"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
+
+                <Border Grid.Column="2" Background="White" CornerRadius="8" Padding="24">
+                    <Grid DataContext="{Binding SelectedDataset}">
+                        <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <Grid Margin="0,0,8,0">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                        <TextBlock Text="{Binding Name, TargetNullValue=请选择一个数据集}" FontSize="23" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                        <StackPanel Grid.Row="1" Margin="0,18,0,0">
+                            <TextBlock Text="类型 / 来源" Foreground="#6B7280" FontSize="12"/>
+                            <TextBlock Margin="0,5,0,0"><Run Text="{Binding TypeName, Mode=OneWay}"/><Run Text="  ←  "/><Run Text="{Binding ParentName, Mode=OneWay}"/></TextBlock>
+                        </StackPanel>
+                        <StackPanel Grid.Row="2" Margin="0,18,0,0">
+                            <TextBlock Text="数据概况" Foreground="#6B7280" FontSize="12"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                <TextBlock Text="{Binding ImageSummary}"/>
+                            </StackPanel>
+                            <TextBlock Text="{Binding ScanStatus}" Foreground="#6B7280" Margin="0,4,0,0" FontSize="12"/>
+                            <TextBlock Text="{Binding FolderSummary}" Margin="0,6,0,0"/>
+                            <TextBlock Text="{Binding ResolutionSummary}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            <TextBlock Text="{Binding BitDepthSummary}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            <TextBlock Text="{Binding ChannelSummary}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            <TextBlock Text="{Binding UnreadableSummary}" Foreground="#6B7280" Margin="0,4,0,0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="3" Margin="0,18,0,0">
+                            <TextBlock Text="目录" Foreground="#6B7280" FontSize="12"/>
+                            <TextBlock Text="{Binding RootPath}" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="4" Margin="0,18,0,10">
+                            <StackPanel>
+                                <TextBlock Text="图片目录明细" Foreground="#6B7280" FontSize="12"/>
+                                <ItemsControl ItemsSource="{Binding ImageFolders}" Margin="0,2,0,16">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,6,0,0">
+                                                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding DisplayPath, Mode=OneWay}" TextWrapping="Wrap" FontWeight="SemiBold"/>
+                                                    <TextBlock Text="{Binding FormatSummary, Mode=OneWay}" Foreground="#6B7280" TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="1" Text="{Binding ImageCount, StringFormat={}{0} 张}" Margin="12,0,0,0"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <StackPanel Margin="0,8,0,22">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding CanHaveAnnotations}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <StackPanel>
+                                        <Border Height="1" Background="#E5E7EB" Margin="0,0,0,16"/>
+                                        <DockPanel Margin="0,0,0,8">
+                                            <Button DockPanel.Dock="Right" Content="＋ 添加标注批次"
+                                                    Command="{Binding DataContext.AddAnnotationCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                            <TextBlock Text="标注批次" Foreground="#6B7280" FontSize="12" VerticalAlignment="Center"/>
+                                        </DockPanel>
+                                        <ListBox ItemsSource="{Binding AnnotationSets}"
+                                                 SelectedItem="{Binding DataContext.SelectedAnnotationSet, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                 BorderThickness="0" Background="Transparent">
+                                            <ListBox.ItemContainerStyle>
+                                                <Style TargetType="ListBoxItem">
+                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                                    <Setter Property="Padding" Value="9"/>
+                                                    <Setter Property="Margin" Value="0,2"/>
+                                                </Style>
+                                            </ListBox.ItemContainerStyle>
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14"/>
+                                                        <TextBlock Text="{Binding LabelPath}" Foreground="#6B7280" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                                                        <TextBlock Text="{Binding Notes}" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                                                            <TextBlock Text="{Binding Statistics.JsonFileCount, StringFormat={}{0} 个 JSON}" Margin="0,0,14,0"/>
+                                                            <TextBlock Text="{Binding Statistics.AnnotationCount, StringFormat={}{0} 个标注实例}" Margin="0,0,14,0"/>
+                                                            <TextBlock Text="{Binding Statistics.InvalidFileCount, StringFormat={}{0} 个异常文件}" Foreground="#B45309"/>
+                                                        </StackPanel>
+                                                        <TextBlock Text="{Binding Statistics.MatchingSummary, Mode=OneWay}"
+                                                                   Foreground="#047857" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                                        <ItemsControl ItemsSource="{Binding Statistics.ClassCounts}" Margin="0,5,0,0">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Border Background="#DBEAFE" CornerRadius="4" Padding="7,3" Margin="0,0,6,5">
+                                                                        <TextBlock><Run Text="{Binding Key, Mode=OneWay}"/><Run Text="  "/><Run Text="{Binding Value, Mode=OneWay}"/></TextBlock>
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                        <TextBlock Text="{Binding Statistics.ScanError}" Foreground="#DC2626" TextWrapping="Wrap"/>
+                                                        <TextBlock Text="{Binding UpdatedAt, StringFormat=更新于 {0:yyyy-MM-dd HH:mm}}" Foreground="#9CA3AF" FontSize="11"/>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                        <WrapPanel DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}" Margin="0,6,0,0">
+                                            <Button Content="编辑标注" Command="{Binding EditAnnotationCommand}"/>
+                                            <Button Content="统计标签与匹配" Command="{Binding RefreshAnnotationCommand}"/>
+                                            <Button Content="移除标注" Command="{Binding RemoveAnnotationCommand}" Foreground="#B91C1C"/>
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </StackPanel>
+                                <TextBlock Text="备注" Foreground="#6B7280" FontSize="12"/>
+                                <TextBlock Text="{Binding Notes, TargetNullValue=暂无备注}" TextWrapping="Wrap" Margin="0,5,0,16"/>
+                                <TextBlock Text="修改记录" Foreground="#6B7280" FontSize="12"/>
+                                <ItemsControl ItemsSource="{Binding Model.ChangeHistory}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="0,7,0,0">
+                                                <TextBlock Text="{Binding Description}" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding ChangedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Foreground="#9CA3AF" FontSize="11"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                        </Grid>
+                        </ScrollViewer>
+                        <WrapPanel Grid.Row="1" Margin="0,10,0,0" DataContext="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}">
+                            <Button Content="编辑" Command="{Binding EditCommand}"/>
+                            <Button Content="重新扫描" Command="{Binding RefreshCommand}"/>
+                            <Button Content="打开目录" Command="{Binding OpenFolderCommand}"/>
+                            <Button Content="移除记录" Command="{Binding RemoveCommand}" Foreground="#B91C1C"/>
+                        </WrapPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <Border Grid.Column="1" Grid.Row="1" Background="#E5E7EB" Padding="10,5">
+            <DockPanel>
+                <TextBlock Text="{Binding NativeStatus}" DockPanel.Dock="Right" Foreground="#6B7280"/>
+                <TextBlock Text="{Binding StatusText}" Foreground="#4B5563"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>
