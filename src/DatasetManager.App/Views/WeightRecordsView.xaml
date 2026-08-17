@@ -1,0 +1,87 @@
+<UserControl x:Class="DatasetManager.App.Views.WeightRecordsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="{StaticResource BackgroundBrush}">
+    <Grid Margin="26,22,26,16">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="340"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="权重记录" FontSize="26" FontWeight="SemiBold" Foreground="#111827"/>
+                <TextBlock Text="登记 PT、ONNX 等模型权重的路径、格式和备注" Foreground="#6B7280" Margin="0,3,0,0"/>
+            </StackPanel>
+            <TextBox Grid.Column="1" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Margin="12,0" VerticalAlignment="Center"
+                     ToolTip="搜索名称、格式、路径或备注"/>
+            <Button Grid.Column="2" Content="＋ 添加权重" Click="Add_Click" VerticalAlignment="Center"
+                    Background="{StaticResource PrimaryBrush}" Foreground="White"/>
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="0,22,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="1.05*"/><ColumnDefinition Width="18"/><ColumnDefinition Width="0.95*"/></Grid.ColumnDefinitions>
+            <Border Background="White" CornerRadius="8" Padding="8">
+                <Grid>
+                    <ListBox ItemsSource="{Binding WeightsView}" SelectedItem="{Binding SelectedWeight}" BorderThickness="0" Background="Transparent">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Padding" Value="12"/><Setter Property="Margin" Value="0,2"/>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" Foreground="#111827"/>
+                                        <TextBlock Text="{Binding FilePath}" Foreground="#6B7280" TextTrimming="CharacterEllipsis" Margin="0,4,0,5"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Border Background="#DBEAFE" CornerRadius="4" Padding="7,2" Margin="0,0,12,0">
+                                                <TextBlock Text="{Binding Format}" Foreground="#1D4ED8" FontWeight="SemiBold"/>
+                                            </Border>
+                                            <TextBlock Text="{Binding FileStatus}" Foreground="#6B7280" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="›" FontSize="24" Foreground="#9CA3AF" VerticalAlignment="Center"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock Text="暂无权重记录，请点击右上角“添加权重”" Foreground="#9CA3AF" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding HasWeights}" Value="False"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="2" Background="White" CornerRadius="8" Padding="24">
+                <Grid>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel DataContext="{Binding SelectedWeight}" Margin="0,0,8,0">
+                            <TextBlock Text="{Binding Name}" FontSize="23" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                            <TextBlock Text="权重格式" Foreground="#6B7280" FontSize="12" Margin="0,20,0,0"/>
+                            <TextBlock Text="{Binding Format}" FontSize="16" FontWeight="SemiBold" Foreground="#2563EB" Margin="0,5,0,0"/>
+                            <TextBlock Text="文件路径" Foreground="#6B7280" FontSize="12" Margin="0,18,0,0"/>
+                            <TextBlock Text="{Binding FilePath}" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                            <TextBlock Text="{Binding FileStatus}" Foreground="#6B7280" Margin="0,5,0,0"/>
+                            <TextBlock Text="备注" Foreground="#6B7280" FontSize="12" Margin="0,18,0,0"/>
+                            <TextBlock Text="{Binding Notes, TargetNullValue=暂无备注}" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                            <TextBlock Text="修改记录" Foreground="#6B7280" FontSize="12" Margin="0,20,0,0"/>
+                            <ItemsControl ItemsSource="{Binding ChangeHistory}">
+                                <ItemsControl.ItemTemplate><DataTemplate><StackPanel Margin="0,7,0,0"><TextBlock Text="{Binding Description}" TextWrapping="Wrap"/><TextBlock Text="{Binding ChangedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Foreground="#9CA3AF" FontSize="11"/></StackPanel></DataTemplate></ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                    <TextBlock Text="请从左侧选择一条权重记录" Foreground="#9CA3AF" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding SelectedWeight}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                    </TextBlock>
+                    <WrapPanel VerticalAlignment="Bottom" Background="White" Margin="0,12,0,0">
+                        <Button Content="编辑" Click="Edit_Click"/>
+                        <Button Content="打开文件位置" Click="Open_Click"/>
+                        <Button Content="移除记录" Click="Remove_Click" Foreground="#B91C1C"/>
+                    </WrapPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -15,7 +15,17 @@ public sealed class DatasetRecord
     public List<DatasetChangeEntry> ChangeHistory { get; set; } = [];
     public List<AnnotationSetRecord> AnnotationSets { get; set; } = [];
     public CompositeDatasetInfo? Composition { get; set; }
+    public MaterializedDatasetInfo? Materialization { get; set; }
     public DatasetStatistics Statistics { get; set; } = new();
+}
+
+public sealed class MaterializedDatasetInfo
+{
+    public string SourceManifestPath { get; set; } = string.Empty;
+    public string ImagesFolderName { get; set; } = "images";
+    public string LabelsFolderName { get; set; } = "jsons";
+    public int PairCount { get; set; }
+    public bool OwnsRootDirectory { get; set; }
 }
 
 public sealed class CompositeDatasetInfo

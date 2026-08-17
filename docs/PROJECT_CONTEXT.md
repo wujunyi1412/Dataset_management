@@ -13,6 +13,14 @@
 - 创建划分数据集时可组合多个“已处理数据集 + 标注批次”，每个来源选择固定对数或全部匹配对。
 - 初版按路径稳定排序后取前 N 对，不随机、不复制文件；输出 JSON 清单记录连续序号、图片绝对路径、标签绝对路径和来源 ID。
 - 划分数据集备注自动列出全部组成来源及实际选取数量，并追加用户补充备注。
+- 左侧“创建数据集”模块将划分清单中的文件复制到新的工具托管根目录；默认子目录为 `images` 和 `jsons`，允许改名。
+- “创建数据集”的来源清单通过下拉框选择已登记的训练集、测试集或验证集，不再手工选择任意 JSON 文件。
+- 复制创建时不覆盖已有根目录；同名样本增加数字后缀，并保持图片与 JSON 主名一致。
+- 已创建数据集记录保存来源清单、子目录名、对数和根目录所有权；删除时仅在所有权标记有效且目标不是磁盘根目录时，永久删除实际根目录和记录。
+- 左侧“YOLO处理”大模块包含“格式转换”和“重复数据集检查”两个小模块，操作记录单独持久化到 `yolo-operations.json`。
+- 左侧“权重记录”模块独立登记 PT、ONNX 等权重文件路径、自动识别格式、备注和修改历史；只管理记录，不复制或删除实际权重文件。
+- 格式转换只处理用户输入的类别，类别输入顺序对应 YOLO ID；LabelMe shape 统一取外接框并输出归一化检测格式，保留相对子目录，生成 `classes.txt`。
+- 重复检查递归比较两个目录的实际标签 TXT 文件名、忽略大小写且排除 `classes.txt`；删除必须明确选择 A 或 B，只删除命中的 TXT 文件并记录备注。
 - 每个数据集必须支持自由备注。
 - 原始数据集和图片数据集扫描只处理图片，不自动查找或读取标签。
 - 一个已处理数据集可以关联多组标注批次；每组独立保存标签路径、名称、规则备注和统计结果。
@@ -28,12 +36,18 @@
 - OpenCV 运行时 DLL 路径：`D:\opencv-4.5.3\opencv-4.5.3\build\install\bin`。
 - 当前 OpenCV 安装经过裁剪，模块清单引用了不存在的 dnn 等库；CMake 只显式链接现有的 core、imgcodecs、imgproc Release 库。
 - 约定在仓库根目录使用 `cmake -S . -B ./build -G "Visual Studio 17 2022" -A x64` 配置整个工程；`native` 目录仍可独立配置。
+- 根目录 `build_release.bat` 是一键 Release 编译入口；正式输出在 `bin/Release`，`build` 仅保存 CMake/Visual Studio 中间文件。
+- 根目录 `publish_standalone.bat` 生成 `bin/Standalone` Windows x64 自包含目录，随包携带 .NET 8、C++、OpenCV 和 Visual C++ x64 运行依赖，分发时复制整个目录。
+- 应用窗口和 EXE 图标由 `20260817-100008.png` 生成，ICO 资源保存在 `src/DatasetManager.App/Assets/DatasetManager.ico`。
 - 优先模块化和可复用，预计需求会持续变化。
 
 ## 初版技术决策
 
 - WPF 目标框架：.NET 8，x64。
 - 持久化：`%LOCALAPPDATA%\DatasetManager\catalog.json`，先保持零外部依赖；将来可替换为 SQLite，只需替换 `IDatasetRepository`。
+- YOLO 操作记录保存在 `%LOCALAPPDATA%\DatasetManager\yolo-operations.json`，首次保存 YOLO 操作后创建。
+- 权重记录保存在 `%LOCALAPPDATA%\DatasetManager\weights.json`，首次保存权重后创建。
+- 组合清单保存在用户指定的 JSON 路径；复制创建的数据集根目录保存 `dataset.json` 和 `.dataset-manager-owned.json`。
 - 数据集只登记绝对路径，不复制、移动或删除用户图片。
 - 派生关系当前为单父级：`ParentDatasetId`；模型未来可以改成关系表以支持多源合并。
 - 类型当前为 `Raw`、`Test`、`Validation`。不要把 train/val/test 目录结构硬编码进扫描逻辑。

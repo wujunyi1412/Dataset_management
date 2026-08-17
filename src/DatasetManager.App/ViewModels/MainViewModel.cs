@@ -17,19 +17,22 @@ public sealed class MainViewModel : ObservableObject
     private readonly DatasetScanner _scanner = new(new NativeImageService());
     private readonly LabelMeAnnotationScanner _annotationScanner = new();
     private readonly CompositeDatasetService _compositeDatasetService = new();
+    private readonly MaterializedDatasetService _materializedDatasetService = new();
     private readonly List<DatasetRecord> _models = [];
     private DatasetItemViewModel? _selectedDataset;
     private AnnotationSetRecord? _selectedAnnotationSet;
     private DatasetType? _filterType;
     private string _searchText = string.Empty;
     private string _statusText = "正在载入…";
+    private bool _isYoloModule;
+    private bool _isWeightModule;
 
     public MainViewModel()
     {
         DatasetsView = CollectionViewSource.GetDefaultView(Datasets);
         DatasetsView.Filter = FilterDataset;
         AddCommand = new RelayCommand(AddDataset);
-        EditCommand = new RelayCommand(EditDataset, () => SelectedDataset is not null && !SelectedDataset.IsCompositeDataset);
+        EditCommand = new RelayCommand(EditDataset, () => SelectedDataset?.Model.Type is DatasetType.Raw or DatasetType.Processed);
         RemoveCommand = new AsyncRelayCommand(RemoveDatasetAsync, () => SelectedDataset is not null);
         RefreshCommand = new AsyncRelayCommand(RefreshSelectedAsync, () => SelectedDataset is not null && SelectedDataset.IsImageDataset);
         OpenFolderCommand = new RelayCommand(OpenSelectedFolder, () => SelectedDataset is not null);
@@ -52,6 +55,9 @@ public sealed class MainViewModel : ObservableObject
     public AsyncRelayCommand RemoveAnnotationCommand { get; }
     public AsyncRelayCommand RefreshAnnotationCommand { get; }
     public string NativeStatus { get; } = new NativeImageService().GetNativeVersion();
+    public bool IsYoloModule => _isYoloModule;
+    public bool IsWeightModule => _isWeightModule;
+    public bool IsDatasetModule => !_isYoloModule && !_isWeightModule;
 
     public DatasetItemViewModel? SelectedDataset
     {
@@ -85,7 +91,9 @@ public sealed class MainViewModel : ObservableObject
         get => _searchText;
         set
         {
-            if (SetProperty(ref _searchText, value)) DatasetsView.Refresh();
+            if (!SetProperty(ref _searchText, value)) return;
+            DatasetsView.Refresh();
+            EnsureSelectionMatchesCurrentView();
         }
     }
 
@@ -97,6 +105,7 @@ public sealed class MainViewModel : ObservableObject
 
     public int RawCount => _models.Count(x => x.Type == DatasetType.Raw);
     public int ProcessedCount => _models.Count(x => x.Type == DatasetType.Processed);
+    public int CreatedCount => _models.Count(x => x.Type == DatasetType.Created);
     public int TrainingCount => _models.Count(x => x.Type == DatasetType.Training);
     public int TestCount => _models.Count(x => x.Type == DatasetType.Test);
     public int ValidationCount => _models.Count(x => x.Type == DatasetType.Validation);
@@ -107,23 +116,37 @@ public sealed class MainViewModel : ObservableObject
         DatasetType.Validation => "验证集",
         DatasetType.Raw => "原始数据集",
         DatasetType.Processed => "已处理数据集",
+        DatasetType.Created => "创建数据集",
         _ => "数据集目录"
     };
-    public string PageSubtitle => _filterType is DatasetType.Training or DatasetType.Test or DatasetType.Validation
-        ? "创建数据集 · 后续可扩展标签转换与重复检查"
-        : "管理来源、用途和每一次修改";
-    public string AddButtonText => _filterType is DatasetType.Training or DatasetType.Test or DatasetType.Validation
-        ? "＋ 创建数据集"
-        : "＋ 添加数据集";
+    public string PageSubtitle => _filterType switch
+    {
+        DatasetType.Created => "从数据集清单复制图片与标签，形成独立数据集",
+        DatasetType.Training or DatasetType.Test or DatasetType.Validation => "创建数据集 · 后续可扩展标签转换与重复检查",
+        _ => "管理来源、用途和每一次修改"
+    };
+    public string AddButtonText => _filterType switch
+    {
+        DatasetType.Created => "＋ 复制创建",
+        DatasetType.Training or DatasetType.Test or DatasetType.Validation => "＋ 创建数据集",
+        _ => "＋ 添加数据集"
+    };
 
     public void SetFilter(DatasetType? type)
     {
+        _isYoloModule = false;
+        _isWeightModule = false;
+        RaisePropertyChanged(nameof(IsYoloModule));
+        RaisePropertyChanged(nameof(IsWeightModule));
+        RaisePropertyChanged(nameof(IsDatasetModule));
         _filterType = type;
         DatasetsView.Refresh();
+        EnsureSelectionMatchesCurrentView();
         StatusText = type switch
         {
             DatasetType.Raw => "原始数据集",
             DatasetType.Processed => "已处理数据集",
+            DatasetType.Created => "创建数据集",
             DatasetType.Training => "训练集",
             DatasetType.Test => "测试集",
             DatasetType.Validation => "验证集",
@@ -132,6 +155,26 @@ public sealed class MainViewModel : ObservableObject
         RaisePropertyChanged(nameof(PageTitle));
         RaisePropertyChanged(nameof(PageSubtitle));
         RaisePropertyChanged(nameof(AddButtonText));
+    }
+
+    public void SetYoloModule()
+    {
+        _isYoloModule = true;
+        _isWeightModule = false;
+        RaisePropertyChanged(nameof(IsYoloModule));
+        RaisePropertyChanged(nameof(IsWeightModule));
+        RaisePropertyChanged(nameof(IsDatasetModule));
+        StatusText = "YOLO处理";
+    }
+
+    public void SetWeightModule()
+    {
+        _isYoloModule = false;
+        _isWeightModule = true;
+        RaisePropertyChanged(nameof(IsYoloModule));
+        RaisePropertyChanged(nameof(IsWeightModule));
+        RaisePropertyChanged(nameof(IsDatasetModule));
+        StatusText = "权重记录";
     }
 
     private async Task LoadAsync()
@@ -151,6 +194,11 @@ public sealed class MainViewModel : ObservableObject
 
     private void AddDataset()
     {
+        if (_filterType == DatasetType.Created)
+        {
+            _ = CreateMaterializedDatasetAsync();
+            return;
+        }
         if (_filterType is DatasetType.Training or DatasetType.Test or DatasetType.Validation)
         {
             _ = CreateCompositeDatasetAsync(_filterType.Value);
@@ -166,6 +214,34 @@ public sealed class MainViewModel : ObservableObject
         _models.Add(dialog.Result);
         RebuildItems(dialog.Result.Id);
         _ = SaveAndScanAsync(dialog.Result);
+    }
+
+    private async Task CreateMaterializedDatasetAsync()
+    {
+        var dialog = new MaterializedDatasetCreatorWindow(_models) { Owner = Application.Current.MainWindow };
+        if (dialog.ShowDialog() != true) return;
+        try
+        {
+            var progress = new Progress<DatasetCopyProgress>(x =>
+                StatusText = $"正在复制文件：{x.Completed:N0} / {x.Total:N0} 对");
+            var record = await _materializedDatasetService.CreateAsync(
+                dialog.DatasetName,
+                dialog.ManifestPath,
+                dialog.DestinationParent,
+                dialog.ImagesFolderName,
+                dialog.LabelsFolderName,
+                dialog.Notes,
+                progress);
+            _models.Add(record);
+            RebuildItems(record.Id);
+            await SaveAsync();
+            StatusText = $"已复制创建 {record.Name}，共 {record.Materialization?.PairCount ?? 0:N0} 对文件";
+        }
+        catch (Exception exception)
+        {
+            StatusText = "复制创建失败";
+            MessageBox.Show(exception.Message, "复制创建数据集失败", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private async Task CreateCompositeDatasetAsync(DatasetType type)
@@ -223,14 +299,36 @@ public sealed class MainViewModel : ObservableObject
         if (SelectedDataset is null) return;
         var model = SelectedDataset.Model;
         var children = _models.Count(x => x.ParentDatasetId == model.Id);
+        var deletesFiles = model.Type == DatasetType.Created && model.Materialization?.OwnsRootDirectory == true;
         var suffix = children > 0 ? $"\n\n有 {children} 个派生数据集会解除源数据集关联。" : string.Empty;
-        if (MessageBox.Show($"只删除“{model.Name}”的管理记录，不会删除磁盘文件。{suffix}", "确认移除",
+        var message = deletesFiles
+            ? $"将永久删除“{model.Name}”的实际数据集目录和管理记录：\n\n{model.RootPath}\n\n来源文件和来源清单不会删除。此操作不可恢复。"
+            : $"只删除“{model.Name}”的管理记录，不会删除磁盘文件。{suffix}";
+        if (MessageBox.Show(message, deletesFiles ? "确认删除实际数据集" : "确认移除",
                 MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
+
+        if (deletesFiles)
+        {
+            try
+            {
+                StatusText = $"正在删除 {model.Name}…";
+                await Task.Run(() => _materializedDatasetService.DeleteOwnedDataset(model));
+            }
+            catch (Exception exception)
+            {
+                StatusText = $"删除 {model.Name} 失败";
+                MessageBox.Show(exception.Message, "删除数据集失败", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+        }
 
         foreach (var child in _models.Where(x => x.ParentDatasetId == model.Id)) child.ParentDatasetId = null;
         _models.Remove(model);
         RebuildItems();
         await SaveAsync();
+        StatusText = deletesFiles
+            ? $"已删除 {model.Name} 的实际数据集和管理记录"
+            : $"已移除 {model.Name} 的管理记录";
     }
 
     private async Task RefreshSelectedAsync()
@@ -362,12 +460,20 @@ public sealed class MainViewModel : ObservableObject
         Datasets.Clear();
         foreach (var model in _models.OrderByDescending(x => x.UpdatedAt))
             Datasets.Add(new DatasetItemViewModel(model, ResolveParentName));
-        SelectedDataset = Datasets.FirstOrDefault(x => x.Id == selectedId) ?? Datasets.FirstOrDefault();
+        SelectedDataset = Datasets.FirstOrDefault(x => x.Id == selectedId && FilterDataset(x))
+            ?? Datasets.FirstOrDefault(x => FilterDataset(x));
         DatasetsView.Refresh();
         RaisePropertyChanged(nameof(RawCount));
         RaisePropertyChanged(nameof(ProcessedCount));
+        RaisePropertyChanged(nameof(CreatedCount));
         RaisePropertyChanged(nameof(TrainingCount));
         RaisePropertyChanged(nameof(TestCount));
         RaisePropertyChanged(nameof(ValidationCount));
+    }
+
+    private void EnsureSelectionMatchesCurrentView()
+    {
+        if (SelectedDataset is not null && FilterDataset(SelectedDataset)) return;
+        SelectedDataset = Datasets.FirstOrDefault(x => FilterDataset(x));
     }
 }

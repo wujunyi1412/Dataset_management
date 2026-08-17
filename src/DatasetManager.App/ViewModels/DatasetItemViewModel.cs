@@ -14,19 +14,26 @@ public sealed class DatasetItemViewModel(DatasetRecord model, Func<Guid?, string
     {
         DatasetType.Raw => "原始数据集",
         DatasetType.Processed => "已处理数据集",
+        DatasetType.Created => "已创建数据集",
         DatasetType.Training => "训练集",
         DatasetType.Test => "测试集",
         DatasetType.Validation => "验证集",
         _ => Model.Type.ToString()
     };
     public string ParentName => Model.ParentDatasetId is null ? "—" : parentNameResolver(Model.ParentDatasetId);
-    public string ImageSummary => IsCompositeDataset
-        ? $"{Model.Composition?.PairCount ?? 0:N0} 对数据"
+    public string ImageSummary => IsCompositeDataset || IsMaterializedDataset
+        ? $"{(IsMaterializedDataset ? Model.Materialization?.PairCount : Model.Composition?.PairCount) ?? 0:N0} 对数据"
         : $"{Model.Statistics.ImageCount:N0} 张图片";
     public bool IsCompositeDataset => Model.Type is DatasetType.Training or DatasetType.Test or DatasetType.Validation;
-    public bool IsImageDataset => !IsCompositeDataset;
+    public bool IsMaterializedDataset => Model.Type == DatasetType.Created;
+    public bool IsImageDataset => !IsCompositeDataset && !IsMaterializedDataset;
     public IReadOnlyList<CompositeSourceInfo> CompositionSources => Model.Composition?.Sources ?? [];
     public string CompositionSummary => $"{CompositionSources.Count:N0} 个组成来源";
+    public string SourceManifestSummary => Model.Materialization?.SourceManifestPath ?? string.Empty;
+    public string OutputFoldersSummary => Model.Materialization is null
+        ? string.Empty
+        : $"图片：{Model.Materialization.ImagesFolderName}　标签：{Model.Materialization.LabelsFolderName}";
+    public string RemoveButtonText => IsMaterializedDataset ? "删除数据集" : "移除记录";
     public bool CanHaveAnnotations => Model.Type == DatasetType.Processed;
     public IReadOnlyList<AnnotationSetRecord> AnnotationSets => Model.AnnotationSets ?? [];
     public string AnnotationSummary => CanHaveAnnotations ? $"{AnnotationSets.Count:N0} 组标注" : string.Empty;
@@ -50,9 +57,13 @@ public sealed class DatasetItemViewModel(DatasetRecord model, Func<Guid?, string
         RaisePropertyChanged(nameof(ImageSummary));
         RaisePropertyChanged(nameof(IsCompositeDataset));
         RaisePropertyChanged(nameof(IsImageDataset));
+        RaisePropertyChanged(nameof(IsMaterializedDataset));
         RaisePropertyChanged(nameof(CompositionSources));
         RaisePropertyChanged(nameof(CompositionSummary));
         RaisePropertyChanged(nameof(PathTitle));
+        RaisePropertyChanged(nameof(SourceManifestSummary));
+        RaisePropertyChanged(nameof(OutputFoldersSummary));
+        RaisePropertyChanged(nameof(RemoveButtonText));
         RaisePropertyChanged(nameof(CanHaveAnnotations));
         RaisePropertyChanged(nameof(AnnotationSets));
         RaisePropertyChanged(nameof(AnnotationSummary));

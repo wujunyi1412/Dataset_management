@@ -1,7 +1,8 @@
 <Window x:Class="DatasetManager.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Dataset Manager" Width="1280" Height="780" MinWidth="1050" MinHeight="650"
+        xmlns:views="clr-namespace:DatasetManager.App.Views"
+        Title="Dataset Manager" Icon="Assets/DatasetManager.ico" Width="1280" Height="780" MinWidth="1050" MinHeight="650"
         WindowStartupLocation="CenterScreen" WindowState="Maximized" Background="{StaticResource BackgroundBrush}">
     <Window.Resources>
         <Style x:Key="NavigationToggleStyle" TargetType="ToggleButton">
@@ -34,12 +35,27 @@
                 <StackPanel DockPanel.Dock="Top">
                     <TextBlock Text="DATASET" Foreground="#93C5FD" FontSize="12" FontWeight="Bold"/>
                     <TextBlock Text="数据集管理" Foreground="White" FontSize="22" FontWeight="SemiBold" Margin="0,4,0,28"/>
+                </StackPanel>
+                <TextBlock DockPanel.Dock="Bottom" Text="只登记目录，不改动文件" Foreground="#9CA3AF" FontSize="12" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="0,0,5,0">
                     <ToggleButton x:Name="AllNavigation" Content="全部数据集" Style="{StaticResource NavigationToggleStyle}" IsChecked="True" Click="All_Click"/>
                     <ToggleButton x:Name="RawNavigation" Style="{StaticResource NavigationToggleStyle}" Click="Raw_Click">
                         <TextBlock><Run Text="原始数据集  "/><Run Text="{Binding RawCount, Mode=OneWay}"/></TextBlock>
                     </ToggleButton>
                     <ToggleButton x:Name="ProcessedNavigation" Style="{StaticResource NavigationToggleStyle}" Click="Processed_Click">
                         <TextBlock><Run Text="已处理数据集  "/><Run Text="{Binding ProcessedCount, Mode=OneWay}"/></TextBlock>
+                    </ToggleButton>
+                    <ToggleButton x:Name="CreatedNavigation" Style="{StaticResource NavigationToggleStyle}" Click="Created_Click">
+                        <TextBlock><Run Text="创建数据集  "/><Run Text="{Binding CreatedCount, Mode=OneWay}"/></TextBlock>
+                    </ToggleButton>
+                    <Border Height="1" Background="#374151" Margin="0,16,0,14"/>
+                    <TextBlock Text="数据集工具" Foreground="#93C5FD" FontSize="11" FontWeight="Bold" Margin="4,0,0,5"/>
+                    <ToggleButton x:Name="YoloNavigation" Style="{StaticResource NavigationToggleStyle}" Click="Yolo_Click">
+                        <TextBlock Text="YOLO处理"/>
+                    </ToggleButton>
+                    <ToggleButton x:Name="WeightNavigation" Style="{StaticResource NavigationToggleStyle}" Click="Weight_Click">
+                        <TextBlock Text="权重记录"/>
                     </ToggleButton>
                     <Border Height="1" Background="#374151" Margin="0,16,0,14"/>
                     <TextBlock Text="数据集划分" Foreground="#93C5FD" FontSize="11" FontWeight="Bold" Margin="4,0,0,5"/>
@@ -53,11 +69,17 @@
                         <TextBlock><Run Text="验证集  "/><Run Text="{Binding ValidationCount, Mode=OneWay}"/></TextBlock>
                     </ToggleButton>
                 </StackPanel>
-                <TextBlock DockPanel.Dock="Bottom" Text="只登记目录，不改动文件" Foreground="#9CA3AF" FontSize="12" TextWrapping="Wrap"/>
+                </ScrollViewer>
             </DockPanel>
         </Border>
 
         <Grid Grid.Column="1" Margin="26,22,26,16">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers><DataTrigger Binding="{Binding IsDatasetModule}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                </Style>
+            </Grid.Style>
             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
             <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="360"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -172,6 +194,16 @@
                                         <ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding Summary, Mode=OneWay}" TextWrapping="Wrap" Margin="0,6,0,0"/></DataTemplate></ItemsControl.ItemTemplate>
                                     </ItemsControl>
                                 </StackPanel>
+                                <StackPanel Margin="0,0,0,18">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsMaterializedDataset}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style>
+                                    </StackPanel.Style>
+                                    <TextBlock Text="复制创建信息" Foreground="#6B7280" FontSize="12"/>
+                                    <TextBlock Text="来源清单" FontWeight="SemiBold" Margin="0,7,0,0"/>
+                                    <TextBlock Text="{Binding SourceManifestSummary}" TextWrapping="Wrap" Foreground="#4B5563" Margin="0,3,0,0"/>
+                                    <TextBlock Text="{Binding OutputFoldersSummary}" TextWrapping="Wrap" Margin="0,7,0,0"/>
+                                    <TextBlock Text="删除该记录会同时永久删除上方实际数据集目录。" Foreground="#B91C1C" Margin="0,7,0,0" TextWrapping="Wrap"/>
+                                </StackPanel>
                                 <StackPanel Margin="0,8,0,22">
                                     <StackPanel.Style>
                                         <Style TargetType="StackPanel">
@@ -259,12 +291,38 @@
                             <Button Content="编辑" Command="{Binding EditCommand}"/>
                             <Button Content="重新扫描" Command="{Binding RefreshCommand}"/>
                             <Button Content="打开目录" Command="{Binding OpenFolderCommand}"/>
-                            <Button Content="移除记录" Command="{Binding RemoveCommand}" Foreground="#B91C1C"/>
+                            <Button Content="{Binding SelectedDataset.RemoveButtonText}" Command="{Binding RemoveCommand}" Foreground="#B91C1C"/>
                         </WrapPanel>
                     </Grid>
                 </Border>
             </Grid>
         </Grid>
+
+        <views:YoloProcessingView Grid.Column="1" Grid.Row="0">
+            <views:YoloProcessingView.Style>
+                <Style TargetType="views:YoloProcessingView">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding DataContext.IsYoloModule, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </views:YoloProcessingView.Style>
+        </views:YoloProcessingView>
+
+        <views:WeightRecordsView Grid.Column="1" Grid.Row="0">
+            <views:WeightRecordsView.Style>
+                <Style TargetType="views:WeightRecordsView">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding DataContext.IsWeightModule, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </views:WeightRecordsView.Style>
+        </views:WeightRecordsView>
 
         <Border Grid.Column="1" Grid.Row="1" Background="#E5E7EB" Padding="10,5">
             <DockPanel>
