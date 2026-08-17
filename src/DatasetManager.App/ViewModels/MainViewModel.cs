@@ -1,7 +1,10 @@
+using System.Collections;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Data;
 using DatasetManager.App.Views;
@@ -31,6 +34,7 @@ public sealed class MainViewModel : ObservableObject
     {
         DatasetsView = CollectionViewSource.GetDefaultView(Datasets);
         DatasetsView.Filter = FilterDataset;
+        ApplyDatasetSort();
         AddCommand = new RelayCommand(AddDataset);
         EditCommand = new RelayCommand(EditDataset, () => SelectedDataset?.Model.Type is DatasetType.Raw or DatasetType.Processed);
         RemoveCommand = new AsyncRelayCommand(RemoveDatasetAsync, () => SelectedDataset is not null);
@@ -140,6 +144,7 @@ public sealed class MainViewModel : ObservableObject
         RaisePropertyChanged(nameof(IsWeightModule));
         RaisePropertyChanged(nameof(IsDatasetModule));
         _filterType = type;
+        ApplyDatasetSort();
         DatasetsView.Refresh();
         EnsureSelectionMatchesCurrentView();
         StatusText = type switch
@@ -475,5 +480,68 @@ public sealed class MainViewModel : ObservableObject
     {
         if (SelectedDataset is not null && FilterDataset(SelectedDataset)) return;
         SelectedDataset = Datasets.FirstOrDefault(x => FilterDataset(x));
+    }
+
+    private void ApplyDatasetSort()
+    {
+        if (DatasetsView is not ListCollectionView listView) return;
+        listView.CustomSort = _filterType is null or DatasetType.Raw or DatasetType.Processed or DatasetType.Created
+            ? DatasetNameDateComparer.Instance
+            : DatasetUpdatedTimeComparer.Instance;
+    }
+
+    private sealed class DatasetNameDateComparer : IComparer
+    {
+        private static readonly Regex DatePattern = new(
+            @"^(?<project>.+)_(?<year>\d{4})_(?<month>\d{2})(?<day>\d{2})(?:_|$)",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+        public static DatasetNameDateComparer Instance { get; } = new();
+
+        public int Compare(object? x, object? y)
+        {
+            if (x is not DatasetItemViewModel left || y is not DatasetItemViewModel right) return 0;
+            var leftHasDate = TryGetNameParts(left.Name, out var leftProject, out var leftDate);
+            var rightHasDate = TryGetNameParts(right.Name, out var rightProject, out var rightDate);
+            if (leftHasDate != rightHasDate) return leftHasDate ? -1 : 1;
+            if (leftHasDate)
+            {
+                var projectComparison = StringComparer.CurrentCultureIgnoreCase.Compare(leftProject, rightProject);
+                if (projectComparison != 0) return projectComparison;
+                var dateComparison = rightDate.CompareTo(leftDate);
+                if (dateComparison != 0) return dateComparison;
+            }
+            return CompareFallback(left, right);
+        }
+
+        private static bool TryGetNameParts(string name, out string project, out DateOnly date)
+        {
+            project = string.Empty;
+            date = default;
+            var match = DatePattern.Match(name);
+            if (!match.Success || !DateOnly.TryParseExact(
+                $"{match.Groups["year"].Value}{match.Groups["month"].Value}{match.Groups["day"].Value}",
+                "yyyyMMdd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out date)) return false;
+            project = match.Groups["project"].Value;
+            return true;
+        }
+    }
+
+    private sealed class DatasetUpdatedTimeComparer : IComparer
+    {
+        public static DatasetUpdatedTimeComparer Instance { get; } = new();
+        public int Compare(object? x, object? y) =>
+            x is DatasetItemViewModel left && y is DatasetItemViewModel right ? CompareFallback(left, right) : 0;
+    }
+
+    private static int CompareFallback(DatasetItemViewModel left, DatasetItemViewModel right)
+    {
+        var updatedComparison = right.Model.UpdatedAt.CompareTo(left.Model.UpdatedAt);
+        return updatedComparison != 0
+            ? updatedComparison
+            : string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase);
     }
 }

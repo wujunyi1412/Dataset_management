@@ -15,10 +15,7 @@ public sealed class YoloOperationRepository
 
     public YoloOperationRepository(string? filePath = null)
     {
-        _filePath = filePath ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "DatasetManager",
-            "yolo-operations.json");
+        _filePath = filePath ?? ApplicationDataPaths.GetRecordFile("yolo-operations.json");
     }
 
     public async Task<IReadOnlyList<YoloOperationRecord>> LoadAsync(CancellationToken cancellationToken = default)

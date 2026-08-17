@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
+using DatasetManager.Core.Services;
 
 namespace DatasetManager.App;
 
@@ -9,6 +10,7 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         DispatcherUnhandledException += OnDispatcherUnhandledException;
+        ApplicationDataPaths.EnsureInitialized();
         base.OnStartup(e);
     }
 
@@ -26,10 +28,7 @@ public partial class App : Application
     {
         try
         {
-            var directory = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "DatasetManager",
-                "logs");
+            var directory = ApplicationDataPaths.LogDirectory;
             Directory.CreateDirectory(directory);
             var path = Path.Combine(directory, $"crash-{DateTime.Now:yyyyMMdd-HHmmss}.log");
             File.WriteAllText(path, exception.ToString());

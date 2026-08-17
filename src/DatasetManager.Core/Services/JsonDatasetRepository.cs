@@ -15,10 +15,7 @@ public sealed class JsonDatasetRepository : IDatasetRepository
 
     public JsonDatasetRepository(string? filePath = null)
     {
-        _filePath = filePath ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "DatasetManager",
-            "catalog.json");
+        _filePath = filePath ?? ApplicationDataPaths.GetRecordFile("catalog.json");
     }
 
     public async Task<IReadOnlyList<DatasetRecord>> LoadAsync(CancellationToken cancellationToken = default)

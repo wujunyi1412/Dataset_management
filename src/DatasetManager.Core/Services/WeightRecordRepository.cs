@@ -10,10 +10,7 @@ public sealed class WeightRecordRepository
 
     public WeightRecordRepository(string? filePath = null)
     {
-        _filePath = filePath ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "DatasetManager",
-            "weights.json");
+        _filePath = filePath ?? ApplicationDataPaths.GetRecordFile("weights.json");
     }
 
     public async Task<IReadOnlyList<WeightRecord>> LoadAsync(CancellationToken cancellationToken = default)

@@ -5,6 +5,7 @@
 ## 当前功能
 
 - 原始数据集、已处理数据集及数据集划分模块分组管理
+- 全部、原始、已处理和创建数据集先按 `_YYYY_MMDD_` 前的项目名称排列，同一项目内再按日期倒序显示
 - 训练集、测试集、验证集作为数据集划分大模块，提供“创建数据集”功能
 - 登记磁盘上的数据集目录，不移动原始文件
 - 派生数据集关联到一个原始数据集
@@ -84,12 +85,13 @@ C++ 构建后会将自身 DLL，以及 `D:\opencv-4.5.3\opencv-4.5.3\build\insta
 
 ## 记录保存位置
 
-程序的管理记录默认保存在当前 Windows 用户的本地应用数据目录，不在 `build` 或 `bin` 目录中：
+程序会在当前 EXE 所在目录旁创建 `records` 文件夹，管理记录与程序放在一起：
 
 ```text
-%LOCALAPPDATA%\DatasetManager\catalog.json
-%LOCALAPPDATA%\DatasetManager\yolo-operations.json
-%LOCALAPPDATA%\DatasetManager\weights.json
+records\catalog.json
+records\yolo-operations.json
+records\weights.json
+records\logs\
 ```
 
 - `catalog.json`：保存原始、已处理、训练、测试、验证和复制创建的数据集记录，包括路径、备注、修改历史、标注批次及统计信息。
@@ -97,6 +99,8 @@ C++ 构建后会将自身 DLL，以及 `D:\opencv-4.5.3\opencv-4.5.3\build\insta
 - `weights.json`：保存权重名称、文件路径、格式、备注及修改记录；移除记录不会删除实际权重文件。
 - 训练集、测试集和验证集的图片/标签配对清单保存在创建时选择的 JSON 路径中；该路径也会记录到 `catalog.json`。
 - 复制创建的数据集目录内会额外保存 `dataset.json` 清单和隐藏的 `.dataset-manager-owned.json` 所有权标记。
-- 程序崩溃日志保存在 `%LOCALAPPDATA%\DatasetManager\logs`。
+- 程序崩溃日志保存在 `records\logs`。
 
-可以在资源管理器地址栏输入 `%LOCALAPPDATA%\DatasetManager` 直接打开记录目录。删除项目里的编译目录不会删除这些管理记录。
+第一次运行新版时，如果 `%LOCALAPPDATA%\DatasetManager` 中存在旧版记录，程序会自动复制到当前 EXE 旁的 `records`；旧记录仍会保留作为备份。之后只读写当前 `records`。普通版位置为 `bin\Release\records`，独立版位置为 `bin\Standalone\records`。
+
+`publish_standalone.bat` 重新发布时会保留 `bin\Standalone\records`。手工删除整个程序目录也会删除其中的记录，因此建议备份时复制整个程序文件夹，或至少单独备份 `records`。

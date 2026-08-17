@@ -7,6 +7,7 @@
 ## 当前需求共识
 
 - 原始数据集：只存图片。
+- 全部、原始、已处理和创建数据集列表先按 `_YYYY_MMDD_` 前的完整项目名称排列，使相同项目连续显示；同一项目内再按解析出的日期倒序排列。例如 `Corona_2026_0516_aaa` 的项目为 `Corona`、日期为 2026-05-16；不符合规则的记录按更新时间排在有效命名记录之后。
 - 外部工具处理后会产生新数据集；处理后的数据集通常含图片和 LabelMe JSON 标签。
 - 当前模块：原始数据集、已处理数据集，以及训练集、测试集、验证集三个数据集划分大模块。
 - 训练/测试/验证模块下的首个小模块叫“创建数据集”；以后继续增加标签转换、重复检查等小模块。
@@ -44,9 +45,9 @@
 ## 初版技术决策
 
 - WPF 目标框架：.NET 8，x64。
-- 持久化：`%LOCALAPPDATA%\DatasetManager\catalog.json`，先保持零外部依赖；将来可替换为 SQLite，只需替换 `IDatasetRepository`。
-- YOLO 操作记录保存在 `%LOCALAPPDATA%\DatasetManager\yolo-operations.json`，首次保存 YOLO 操作后创建。
-- 权重记录保存在 `%LOCALAPPDATA%\DatasetManager\weights.json`，首次保存权重后创建。
+- 持久化目录固定为 EXE 同级的 `records`，使记录随程序目录一起备份和迁移；数据集、YOLO、权重及日志分别保存在 `catalog.json`、`yolo-operations.json`、`weights.json` 和 `logs`。
+- 新版首次启动时从 `%LOCALAPPDATA%\DatasetManager` 复制缺失的旧记录，旧目录保留为迁移备份；后续只读写当前 EXE 旁的 `records`。
+- `publish_standalone.bat` 使用临时发布目录，成功后继承原 `bin/Standalone/records` 再替换程序文件，发布失败不破坏现有独立版和记录。
 - 组合清单保存在用户指定的 JSON 路径；复制创建的数据集根目录保存 `dataset.json` 和 `.dataset-manager-owned.json`。
 - 数据集只登记绝对路径，不复制、移动或删除用户图片。
 - 派生关系当前为单父级：`ParentDatasetId`；模型未来可以改成关系表以支持多源合并。
