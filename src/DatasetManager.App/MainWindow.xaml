@@ -41,6 +41,11 @@
                     <ToggleButton x:Name="ProcessedNavigation" Style="{StaticResource NavigationToggleStyle}" Click="Processed_Click">
                         <TextBlock><Run Text="已处理数据集  "/><Run Text="{Binding ProcessedCount, Mode=OneWay}"/></TextBlock>
                     </ToggleButton>
+                    <Border Height="1" Background="#374151" Margin="0,16,0,14"/>
+                    <TextBlock Text="数据集划分" Foreground="#93C5FD" FontSize="11" FontWeight="Bold" Margin="4,0,0,5"/>
+                    <ToggleButton x:Name="TrainingNavigation" Style="{StaticResource NavigationToggleStyle}" Click="Training_Click">
+                        <TextBlock><Run Text="训练集  "/><Run Text="{Binding TrainingCount, Mode=OneWay}"/></TextBlock>
+                    </ToggleButton>
                     <ToggleButton x:Name="TestNavigation" Style="{StaticResource NavigationToggleStyle}" Click="Test_Click">
                         <TextBlock><Run Text="测试集  "/><Run Text="{Binding TestCount, Mode=OneWay}"/></TextBlock>
                     </ToggleButton>
@@ -57,12 +62,12 @@
             <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="360"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <StackPanel>
-                    <TextBlock Text="数据集目录" FontSize="26" FontWeight="SemiBold" Foreground="#111827"/>
-                    <TextBlock Text="管理来源、用途和每一次修改" Foreground="#6B7280" Margin="0,3,0,0"/>
+                    <TextBlock Text="{Binding PageTitle}" FontSize="26" FontWeight="SemiBold" Foreground="#111827"/>
+                    <TextBlock Text="{Binding PageSubtitle}" Foreground="#6B7280" Margin="0,3,0,0"/>
                 </StackPanel>
                 <TextBox Grid.Column="1" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"
                          Margin="12,0" ToolTip="搜索名称、路径或备注"/>
-                <Button Grid.Column="2" Content="＋ 添加数据集" Command="{Binding AddCommand}" VerticalAlignment="Center"
+                <Button Grid.Column="2" Content="{Binding AddButtonText}" Command="{Binding AddCommand}" VerticalAlignment="Center"
                         Background="{StaticResource PrimaryBrush}" Foreground="White"/>
             </Grid>
 
@@ -112,19 +117,36 @@
                             <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
                                 <TextBlock Text="{Binding ImageSummary}"/>
                             </StackPanel>
-                            <TextBlock Text="{Binding ScanStatus}" Foreground="#6B7280" Margin="0,4,0,0" FontSize="12"/>
-                            <TextBlock Text="{Binding FolderSummary}" Margin="0,6,0,0"/>
-                            <TextBlock Text="{Binding ResolutionSummary}" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                            <TextBlock Text="{Binding BitDepthSummary}" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                            <TextBlock Text="{Binding ChannelSummary}" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                            <TextBlock Text="{Binding UnreadableSummary}" Foreground="#6B7280" Margin="0,4,0,0"/>
+                            <StackPanel>
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers><DataTrigger Binding="{Binding IsImageDataset}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Text="{Binding ScanStatus}" Foreground="#6B7280" Margin="0,4,0,0" FontSize="12"/>
+                                <TextBlock Text="{Binding FolderSummary}" Margin="0,6,0,0"/>
+                                <TextBlock Text="{Binding ResolutionSummary}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                <TextBlock Text="{Binding BitDepthSummary}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                <TextBlock Text="{Binding ChannelSummary}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                <TextBlock Text="{Binding UnreadableSummary}" Foreground="#6B7280" Margin="0,4,0,0"/>
+                            </StackPanel>
+                            <TextBlock Text="{Binding CompositionSummary}" Margin="0,5,0,0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsCompositeDataset}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </StackPanel>
                         <StackPanel Grid.Row="3" Margin="0,18,0,0">
-                            <TextBlock Text="目录" Foreground="#6B7280" FontSize="12"/>
+                            <TextBlock Text="{Binding PathTitle}" Foreground="#6B7280" FontSize="12"/>
                             <TextBlock Text="{Binding RootPath}" TextWrapping="Wrap" Margin="0,5,0,0"/>
                         </StackPanel>
                         <StackPanel Grid.Row="4" Margin="0,18,0,10">
                             <StackPanel>
+                                <StackPanel>
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsImageDataset}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style>
+                                    </StackPanel.Style>
                                 <TextBlock Text="图片目录明细" Foreground="#6B7280" FontSize="12"/>
                                 <ItemsControl ItemsSource="{Binding ImageFolders}" Margin="0,2,0,16">
                                     <ItemsControl.ItemTemplate>
@@ -140,6 +162,16 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,0,18">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsCompositeDataset}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style>
+                                    </StackPanel.Style>
+                                    <TextBlock Text="组成来源" Foreground="#6B7280" FontSize="12"/>
+                                    <ItemsControl ItemsSource="{Binding CompositionSources}" Margin="0,3,0,0">
+                                        <ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding Summary, Mode=OneWay}" TextWrapping="Wrap" Margin="0,6,0,0"/></DataTemplate></ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
                                 <StackPanel Margin="0,8,0,22">
                                     <StackPanel.Style>
                                         <Style TargetType="StackPanel">

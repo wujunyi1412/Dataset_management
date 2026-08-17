@@ -16,6 +16,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly IDatasetRepository _repository = new JsonDatasetRepository();
     private readonly DatasetScanner _scanner = new(new NativeImageService());
     private readonly LabelMeAnnotationScanner _annotationScanner = new();
+    private readonly CompositeDatasetService _compositeDatasetService = new();
     private readonly List<DatasetRecord> _models = [];
     private DatasetItemViewModel? _selectedDataset;
     private AnnotationSetRecord? _selectedAnnotationSet;
@@ -28,9 +29,9 @@ public sealed class MainViewModel : ObservableObject
         DatasetsView = CollectionViewSource.GetDefaultView(Datasets);
         DatasetsView.Filter = FilterDataset;
         AddCommand = new RelayCommand(AddDataset);
-        EditCommand = new RelayCommand(EditDataset, () => SelectedDataset is not null);
+        EditCommand = new RelayCommand(EditDataset, () => SelectedDataset is not null && !SelectedDataset.IsCompositeDataset);
         RemoveCommand = new AsyncRelayCommand(RemoveDatasetAsync, () => SelectedDataset is not null);
-        RefreshCommand = new AsyncRelayCommand(RefreshSelectedAsync, () => SelectedDataset is not null);
+        RefreshCommand = new AsyncRelayCommand(RefreshSelectedAsync, () => SelectedDataset is not null && SelectedDataset.IsImageDataset);
         OpenFolderCommand = new RelayCommand(OpenSelectedFolder, () => SelectedDataset is not null);
         AddAnnotationCommand = new RelayCommand(AddAnnotationSet, CanAddAnnotationSet);
         EditAnnotationCommand = new RelayCommand(EditAnnotationSet, () => SelectedAnnotationSet is not null);
@@ -96,8 +97,24 @@ public sealed class MainViewModel : ObservableObject
 
     public int RawCount => _models.Count(x => x.Type == DatasetType.Raw);
     public int ProcessedCount => _models.Count(x => x.Type == DatasetType.Processed);
+    public int TrainingCount => _models.Count(x => x.Type == DatasetType.Training);
     public int TestCount => _models.Count(x => x.Type == DatasetType.Test);
     public int ValidationCount => _models.Count(x => x.Type == DatasetType.Validation);
+    public string PageTitle => _filterType switch
+    {
+        DatasetType.Training => "训练集",
+        DatasetType.Test => "测试集",
+        DatasetType.Validation => "验证集",
+        DatasetType.Raw => "原始数据集",
+        DatasetType.Processed => "已处理数据集",
+        _ => "数据集目录"
+    };
+    public string PageSubtitle => _filterType is DatasetType.Training or DatasetType.Test or DatasetType.Validation
+        ? "创建数据集 · 后续可扩展标签转换与重复检查"
+        : "管理来源、用途和每一次修改";
+    public string AddButtonText => _filterType is DatasetType.Training or DatasetType.Test or DatasetType.Validation
+        ? "＋ 创建数据集"
+        : "＋ 添加数据集";
 
     public void SetFilter(DatasetType? type)
     {
@@ -107,10 +124,14 @@ public sealed class MainViewModel : ObservableObject
         {
             DatasetType.Raw => "原始数据集",
             DatasetType.Processed => "已处理数据集",
+            DatasetType.Training => "训练集",
             DatasetType.Test => "测试集",
             DatasetType.Validation => "验证集",
             _ => "全部数据集"
         };
+        RaisePropertyChanged(nameof(PageTitle));
+        RaisePropertyChanged(nameof(PageSubtitle));
+        RaisePropertyChanged(nameof(AddButtonText));
     }
 
     private async Task LoadAsync()
@@ -130,6 +151,11 @@ public sealed class MainViewModel : ObservableObject
 
     private void AddDataset()
     {
+        if (_filterType is DatasetType.Training or DatasetType.Test or DatasetType.Validation)
+        {
+            _ = CreateCompositeDatasetAsync(_filterType.Value);
+            return;
+        }
         var dialog = new DatasetEditorWindow(_models, null) { Owner = Application.Current.MainWindow };
         if (dialog.ShowDialog() != true || dialog.Result is null) return;
 
@@ -140,6 +166,35 @@ public sealed class MainViewModel : ObservableObject
         _models.Add(dialog.Result);
         RebuildItems(dialog.Result.Id);
         _ = SaveAndScanAsync(dialog.Result);
+    }
+
+    private async Task CreateCompositeDatasetAsync(DatasetType type)
+    {
+        var dialog = new CompositeDatasetCreatorWindow(type, _models) { Owner = Application.Current.MainWindow };
+        if (dialog.ShowDialog() != true) return;
+        if (File.Exists(dialog.ManifestPath)
+            && MessageBox.Show($"清单文件已存在：\n{dialog.ManifestPath}\n\n是否覆盖？", "确认覆盖",
+                MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
+
+        try
+        {
+            StatusText = $"正在创建{PageTitle}…";
+            var record = await _compositeDatasetService.CreateAsync(
+                dialog.DatasetName,
+                type,
+                dialog.ManifestPath,
+                dialog.Notes,
+                dialog.Sources.Select(x => x.ToRequest()).ToArray());
+            _models.Add(record);
+            RebuildItems(record.Id);
+            await SaveAsync();
+            StatusText = $"已创建 {record.Name}，共 {record.Composition?.PairCount ?? 0} 对数据";
+        }
+        catch (Exception exception)
+        {
+            StatusText = "创建数据集失败";
+            MessageBox.Show(exception.Message, "创建数据集失败", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void EditDataset()
@@ -258,12 +313,13 @@ public sealed class MainViewModel : ObservableObject
     private void OpenSelectedFolder()
     {
         var rootPath = SelectedDataset?.RootPath;
-        if (rootPath is null || !Directory.Exists(rootPath))
+        if (rootPath is null || (!Directory.Exists(rootPath) && !File.Exists(rootPath)))
         {
             MessageBox.Show("数据集目录不存在。", "无法打开", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        Process.Start(new ProcessStartInfo("explorer.exe", rootPath) { UseShellExecute = true });
+        var arguments = File.Exists(rootPath) ? $"/select,\"{rootPath}\"" : $"\"{rootPath}\"";
+        Process.Start(new ProcessStartInfo("explorer.exe", arguments) { UseShellExecute = true });
     }
 
     private async Task SaveAndScanAsync(DatasetRecord model)
@@ -310,6 +366,7 @@ public sealed class MainViewModel : ObservableObject
         DatasetsView.Refresh();
         RaisePropertyChanged(nameof(RawCount));
         RaisePropertyChanged(nameof(ProcessedCount));
+        RaisePropertyChanged(nameof(TrainingCount));
         RaisePropertyChanged(nameof(TestCount));
         RaisePropertyChanged(nameof(ValidationCount));
     }

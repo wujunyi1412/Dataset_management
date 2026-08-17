@@ -4,6 +4,7 @@ public enum DatasetType
 {
     Raw,
     Processed,
+    Training,
     Test,
     Validation
 }

@@ -8,17 +8,25 @@ public sealed class DatasetItemViewModel(DatasetRecord model, Func<Guid?, string
     public Guid Id => Model.Id;
     public string Name => Model.Name;
     public string RootPath => Model.RootPath;
+    public string PathTitle => IsCompositeDataset ? "数据集清单" : "目录";
     public string Notes => Model.Notes;
     public string TypeName => Model.Type switch
     {
         DatasetType.Raw => "原始数据集",
         DatasetType.Processed => "已处理数据集",
+        DatasetType.Training => "训练集",
         DatasetType.Test => "测试集",
         DatasetType.Validation => "验证集",
         _ => Model.Type.ToString()
     };
     public string ParentName => Model.ParentDatasetId is null ? "—" : parentNameResolver(Model.ParentDatasetId);
-    public string ImageSummary => $"{Model.Statistics.ImageCount:N0} 张图片";
+    public string ImageSummary => IsCompositeDataset
+        ? $"{Model.Composition?.PairCount ?? 0:N0} 对数据"
+        : $"{Model.Statistics.ImageCount:N0} 张图片";
+    public bool IsCompositeDataset => Model.Type is DatasetType.Training or DatasetType.Test or DatasetType.Validation;
+    public bool IsImageDataset => !IsCompositeDataset;
+    public IReadOnlyList<CompositeSourceInfo> CompositionSources => Model.Composition?.Sources ?? [];
+    public string CompositionSummary => $"{CompositionSources.Count:N0} 个组成来源";
     public bool CanHaveAnnotations => Model.Type == DatasetType.Processed;
     public IReadOnlyList<AnnotationSetRecord> AnnotationSets => Model.AnnotationSets ?? [];
     public string AnnotationSummary => CanHaveAnnotations ? $"{AnnotationSets.Count:N0} 组标注" : string.Empty;
@@ -40,6 +48,11 @@ public sealed class DatasetItemViewModel(DatasetRecord model, Func<Guid?, string
         RaisePropertyChanged(nameof(TypeName));
         RaisePropertyChanged(nameof(ParentName));
         RaisePropertyChanged(nameof(ImageSummary));
+        RaisePropertyChanged(nameof(IsCompositeDataset));
+        RaisePropertyChanged(nameof(IsImageDataset));
+        RaisePropertyChanged(nameof(CompositionSources));
+        RaisePropertyChanged(nameof(CompositionSummary));
+        RaisePropertyChanged(nameof(PathTitle));
         RaisePropertyChanged(nameof(CanHaveAnnotations));
         RaisePropertyChanged(nameof(AnnotationSets));
         RaisePropertyChanged(nameof(AnnotationSummary));

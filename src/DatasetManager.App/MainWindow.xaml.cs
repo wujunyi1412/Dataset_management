@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     private void All_Click(object sender, RoutedEventArgs e) => SelectNavigation(null, AllNavigation);
     private void Raw_Click(object sender, RoutedEventArgs e) => SelectNavigation(DatasetType.Raw, RawNavigation);
     private void Processed_Click(object sender, RoutedEventArgs e) => SelectNavigation(DatasetType.Processed, ProcessedNavigation);
+    private void Training_Click(object sender, RoutedEventArgs e) => SelectNavigation(DatasetType.Training, TrainingNavigation);
     private void Test_Click(object sender, RoutedEventArgs e) => SelectNavigation(DatasetType.Test, TestNavigation);
     private void Validation_Click(object sender, RoutedEventArgs e) => SelectNavigation(DatasetType.Validation, ValidationNavigation);
 
@@ -26,6 +27,7 @@ public partial class MainWindow : Window
         AllNavigation.IsChecked = false;
         RawNavigation.IsChecked = false;
         ProcessedNavigation.IsChecked = false;
+        TrainingNavigation.IsChecked = false;
         TestNavigation.IsChecked = false;
         ValidationNavigation.IsChecked = false;
         selected.IsChecked = true;

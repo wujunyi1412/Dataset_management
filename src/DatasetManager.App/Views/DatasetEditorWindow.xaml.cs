@@ -17,8 +17,6 @@ public partial class DatasetEditorWindow : Window
         {
             new TypeOption("原始数据集", DatasetType.Raw),
             new TypeOption("已处理数据集", DatasetType.Processed),
-            new TypeOption("测试集", DatasetType.Test),
-            new TypeOption("验证集", DatasetType.Validation)
         };
         ParentBox.ItemsSource = new[] { new ParentOption("无（独立数据集）", null) }
             .Concat(datasets.Where(x => x.Id != existing?.Id && x.Type == DatasetType.Raw)

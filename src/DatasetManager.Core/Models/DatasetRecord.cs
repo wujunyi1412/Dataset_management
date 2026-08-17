@@ -14,7 +14,29 @@ public sealed class DatasetRecord
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.Now;
     public List<DatasetChangeEntry> ChangeHistory { get; set; } = [];
     public List<AnnotationSetRecord> AnnotationSets { get; set; } = [];
+    public CompositeDatasetInfo? Composition { get; set; }
     public DatasetStatistics Statistics { get; set; } = new();
+}
+
+public sealed class CompositeDatasetInfo
+{
+    public int PairCount { get; set; }
+    public List<CompositeSourceInfo> Sources { get; set; } = [];
+}
+
+public sealed class CompositeSourceInfo
+{
+    public Guid ProcessedDatasetId { get; set; }
+    public string ProcessedDatasetName { get; set; } = string.Empty;
+    public Guid AnnotationSetId { get; set; }
+    public string AnnotationSetName { get; set; } = string.Empty;
+    public int? RequestedCount { get; set; }
+    public int SelectedCount { get; set; }
+
+    [JsonIgnore]
+    public string Summary => RequestedCount is null
+        ? $"{ProcessedDatasetName} / {AnnotationSetName}：全部，共 {SelectedCount} 对"
+        : $"{ProcessedDatasetName} / {AnnotationSetName}：{SelectedCount} 对";
 }
 
 public sealed class DatasetChangeEntry
