@@ -21,6 +21,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly LabelMeAnnotationScanner _annotationScanner = new();
     private readonly CompositeDatasetService _compositeDatasetService = new();
     private readonly MaterializedDatasetService _materializedDatasetService = new();
+    private readonly DatasetMigrationService _datasetMigrationService = new();
     private readonly List<DatasetRecord> _models = [];
     private DatasetItemViewModel? _selectedDataset;
     private AnnotationSetRecord? _selectedAnnotationSet;
@@ -40,6 +41,8 @@ public sealed class MainViewModel : ObservableObject
         RemoveCommand = new AsyncRelayCommand(RemoveDatasetAsync, () => SelectedDataset is not null);
         RefreshCommand = new AsyncRelayCommand(RefreshSelectedAsync, () => SelectedDataset is not null && SelectedDataset.IsImageDataset);
         OpenFolderCommand = new RelayCommand(OpenSelectedFolder, () => SelectedDataset is not null);
+        MigrateCommand = new AsyncRelayCommand(MigrateDatasetAsync,
+            () => SelectedDataset?.Model.Type is DatasetType.Raw or DatasetType.Processed or DatasetType.Created);
         AddAnnotationCommand = new RelayCommand(AddAnnotationSet, CanAddAnnotationSet);
         EditAnnotationCommand = new RelayCommand(EditAnnotationSet, () => SelectedAnnotationSet is not null);
         RemoveAnnotationCommand = new AsyncRelayCommand(RemoveAnnotationSetAsync, () => SelectedAnnotationSet is not null);
@@ -54,6 +57,7 @@ public sealed class MainViewModel : ObservableObject
     public AsyncRelayCommand RemoveCommand { get; }
     public AsyncRelayCommand RefreshCommand { get; }
     public RelayCommand OpenFolderCommand { get; }
+    public AsyncRelayCommand MigrateCommand { get; }
     public RelayCommand AddAnnotationCommand { get; }
     public RelayCommand EditAnnotationCommand { get; }
     public AsyncRelayCommand RemoveAnnotationCommand { get; }
@@ -73,6 +77,7 @@ public sealed class MainViewModel : ObservableObject
             RemoveCommand.RaiseCanExecuteChanged();
             RefreshCommand.RaiseCanExecuteChanged();
             OpenFolderCommand.RaiseCanExecuteChanged();
+            MigrateCommand.RaiseCanExecuteChanged();
             SelectedAnnotationSet = value?.AnnotationSets.FirstOrDefault();
             AddAnnotationCommand.RaiseCanExecuteChanged();
         }
@@ -339,6 +344,90 @@ public sealed class MainViewModel : ObservableObject
     private async Task RefreshSelectedAsync()
     {
         if (SelectedDataset is not null) await SaveAndScanAsync(SelectedDataset.Model);
+    }
+
+    private async Task MigrateDatasetAsync()
+    {
+        if (SelectedDataset?.Model is not { Type: DatasetType.Raw or DatasetType.Processed or DatasetType.Created } model)
+            return;
+        var dialog = new DatasetMigrationWindow(model) { Owner = Application.Current.MainWindow };
+        if (dialog.ShowDialog() != true) return;
+        if (dialog.Mode == DatasetMigrationMode.Move
+            && MessageBox.Show(
+                $"迁移并保存新记录后，将删除原数据目录：\n\n{model.RootPath}\n\n已登记且位于主目录外的标签目录也会删除。是否继续？",
+                "确认剪切 / 移动", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK)
+            return;
+
+        DatasetMigrationResult? result = null;
+        var oldRootPath = model.RootPath;
+        var oldUpdatedAt = model.UpdatedAt;
+        var oldSourceManifestPath = model.Materialization?.SourceManifestPath;
+        var oldAnnotationPaths = (model.AnnotationSets ?? []).ToDictionary(x => x.Id, x => (x.LabelPath, x.UpdatedAt));
+        var oldHistoryCount = model.ChangeHistory.Count;
+        try
+        {
+            var progress = new Progress<DatasetMigrationProgress>(x =>
+                StatusText = $"正在迁移文件：{x.CompletedFiles:N0} / {x.TotalFiles:N0}");
+            result = await _datasetMigrationService.PrepareAsync(model, dialog.DestinationRoot, progress);
+
+            model.RootPath = result.DestinationRoot;
+            if (model.Materialization is not null)
+                model.Materialization.SourceManifestPath = result.RemapRootedPath(model.Materialization.SourceManifestPath);
+            foreach (var annotation in model.AnnotationSets ?? [])
+            {
+                if (!result.AnnotationPaths.TryGetValue(annotation.Id, out var path)) continue;
+                annotation.LabelPath = path;
+                annotation.UpdatedAt = DateTimeOffset.Now;
+            }
+            model.UpdatedAt = DateTimeOffset.Now;
+            model.ChangeHistory.Add(new DatasetChangeEntry
+            {
+                Description = $"{(dialog.Mode == DatasetMigrationMode.Move ? "移动" : "复制")}数据集：{oldRootPath} → {result.DestinationRoot}"
+            });
+
+            await _repository.SaveAsync(_models);
+        }
+        catch (Exception exception)
+        {
+            model.RootPath = oldRootPath;
+            model.UpdatedAt = oldUpdatedAt;
+            if (model.Materialization is not null && oldSourceManifestPath is not null)
+                model.Materialization.SourceManifestPath = oldSourceManifestPath;
+            foreach (var annotation in model.AnnotationSets ?? [])
+            {
+                if (!oldAnnotationPaths.TryGetValue(annotation.Id, out var old)) continue;
+                annotation.LabelPath = old.LabelPath;
+                annotation.UpdatedAt = old.UpdatedAt;
+            }
+            if (model.ChangeHistory.Count > oldHistoryCount)
+                model.ChangeHistory.RemoveRange(oldHistoryCount, model.ChangeHistory.Count - oldHistoryCount);
+            if (result is not null) _datasetMigrationService.DeletePreparedDestination(result);
+            RebuildItems(model.Id);
+            StatusText = "数据迁移失败";
+            MessageBox.Show(exception.Message, "数据迁移失败", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        RebuildItems(model.Id);
+        if (dialog.Mode == DatasetMigrationMode.Copy)
+        {
+            StatusText = $"已复制并更新记录，共迁移 {result!.CopiedFileCount:N0} 个文件";
+            return;
+        }
+
+        var cleanupFailures = await Task.Run(() => _datasetMigrationService.DeleteSources(result!));
+        if (cleanupFailures.Count == 0)
+        {
+            StatusText = $"已移动并更新记录，共迁移 {result!.CopiedFileCount:N0} 个文件";
+        }
+        else
+        {
+            StatusText = "新路径和记录已更新，但部分原文件未能删除";
+            MessageBox.Show(
+                "数据已复制到新路径，记录也已更新，但以下原目录未能删除，请确认没有程序占用后手动处理：\n\n"
+                + string.Join("\n", cleanupFailures),
+                "迁移完成，原目录清理不完整", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private bool CanAddAnnotationSet() => SelectedDataset?.Model.Type == DatasetType.Processed;

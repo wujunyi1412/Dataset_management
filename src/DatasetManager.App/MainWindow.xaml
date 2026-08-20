@@ -291,6 +291,7 @@
                             <Button Content="编辑" Command="{Binding EditCommand}"/>
                             <Button Content="重新扫描" Command="{Binding RefreshCommand}"/>
                             <Button Content="打开目录" Command="{Binding OpenFolderCommand}"/>
+                            <Button Content="迁移数据" Command="{Binding MigrateCommand}"/>
                             <Button Content="{Binding SelectedDataset.RemoveButtonText}" Command="{Binding RemoveCommand}" Foreground="#B91C1C"/>
                         </WrapPanel>
                     </Grid>
