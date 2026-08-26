@@ -50,6 +50,9 @@ public partial class YoloProcessingView : UserControl
         var output = ConversionOutputBox.Text.Trim();
         var categories = CategoriesBox.Text.Split(['\r', '\n', ',', ';', '，', '；'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Distinct(StringComparer.Ordinal).ToArray();
+        var annotationType = Enum.Parse<YoloAnnotationType>(((ComboBoxItem)AnnotationTypeBox.SelectedItem).Tag.ToString()!);
+        var checkEmptyLabels = CheckEmptyLabelsBox.IsChecked == true;
+        var deleteEmptyLabels = checkEmptyLabels && DeleteEmptyLabelsBox.IsChecked == true;
         if (!Directory.Exists(source) || !Directory.Exists(output) || categories.Length == 0)
         {
             ConversionStatusText.Foreground = Brushes.Firebrick;
@@ -65,9 +68,14 @@ public partial class YoloProcessingView : UserControl
         try
         {
             var progress = new Progress<YoloConversionProgress>(x => ConversionStatusText.Text = $"正在转换：{x.Completed} / {x.Total}");
-            var result = await _converter.ConvertAsync(source, output, categories, progress);
+            var result = await _converter.ConvertAsync(
+                source, output, categories, annotationType, checkEmptyLabels, deleteEmptyLabels, progress);
             var categorySummary = string.Join("，", result.CategoryCounts.Select(x => $"{x.Key} {x.Value}"));
-            var summary = $"{result.OutputFileCount} 个 TXT，{result.ConvertedAnnotationCount} 个标注，异常 {result.InvalidFileCount} 个；{categorySummary}";
+            var typeName = annotationType == YoloAnnotationType.ObjectDetection ? "目标检测" : "语义分割";
+            var emptySummary = checkEmptyLabels
+                ? $"，空标签 {result.EmptyLabelFileCount} 个" + (deleteEmptyLabels ? $"，已删除 {result.DeletedEmptyLabelFileCount} 个" : "，已保留")
+                : "，未检查空标签";
+            var summary = $"{typeName}；{result.OutputFileCount} 个 TXT，{result.ConvertedAnnotationCount} 个标注，异常 {result.InvalidFileCount} 个{emptySummary}；{categorySummary}";
             ConversionStatusText.Text = "转换完成：" + summary;
             await AddRecordAsync(new YoloOperationRecord
             {

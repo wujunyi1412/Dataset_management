@@ -27,10 +27,19 @@
                                 <TextBox x:Name="ConversionOutputBox"/>
                                 <Button Grid.Column="1" Content="浏览…" Click="BrowseConversionOutput_Click" Margin="8,0,0,0"/>
                             </Grid>
+                            <TextBlock Text="转换目标 *" Margin="0,0,0,6"/>
+                            <ComboBox x:Name="AnnotationTypeBox" Padding="7" SelectedIndex="0" Margin="0,0,0,5">
+                                <ComboBoxItem Content="目标检测（外接框：class x_center y_center width height）" Tag="ObjectDetection"/>
+                                <ComboBoxItem Content="语义分割（多边形：class x1 y1 x2 y2 …）" Tag="SemanticSegmentation"/>
+                            </ComboBox>
+                            <TextBlock Text="分割模式会保留 polygon 顶点；LabelMe rectangle 会转换成四个角点。" Foreground="#6B7280" FontSize="11" Margin="0,0,0,13"/>
                             <TextBlock Text="需要转换的类别 *" Margin="0,0,0,6"/>
                             <TextBox x:Name="CategoriesBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="90"
                                      ToolTip="按行、逗号或分号分隔；输入顺序就是 YOLO 类别 ID 顺序"/>
                             <TextBlock Text="示例：scratch, particle, haze（依次对应类别 ID 0、1、2）" Foreground="#6B7280" FontSize="11" Margin="0,5,0,13"/>
+                            <CheckBox x:Name="CheckEmptyLabelsBox" Content="转换完成后检查本次生成的空标签" IsChecked="True" Margin="0,0,0,7"/>
+                            <CheckBox x:Name="DeleteEmptyLabelsBox" Content="删除检查到的空标签 TXT" Margin="20,0,0,5"/>
+                            <TextBlock Text="仅检查和删除本次转换生成的 TXT，不处理输出目录中的其他文件。" Foreground="#B45309" FontSize="11" Margin="20,0,0,13"/>
                             <TextBlock Text="操作备注" Margin="0,0,0,6"/>
                             <TextBox x:Name="ConversionNotesBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="62"/>
                             <TextBlock x:Name="ConversionStatusText" Foreground="#2563EB" TextWrapping="Wrap" Margin="0,12,0,4"/>

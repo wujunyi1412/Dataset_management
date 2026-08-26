@@ -10,6 +10,9 @@ public sealed class LabelMeToYoloConverter
         string sourceDirectory,
         string outputDirectory,
         IReadOnlyList<string> categories,
+        YoloAnnotationType annotationType,
+        bool checkEmptyLabels,
+        bool deleteEmptyLabels,
         IProgress<YoloConversionProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -64,19 +67,15 @@ public sealed class LabelMeToYoloConverter
                         if (point.ValueKind != JsonValueKind.Array || point.GetArrayLength() < 2) continue;
                         if (point[0].TryGetDouble(out var x) && point[1].TryGetDouble(out var y)) coordinates.Add((x, y));
                     }
-                    if (coordinates.Count < 2) continue;
-                    var minX = Math.Clamp(coordinates.Min(x => x.X), 0, imageWidth);
-                    var maxX = Math.Clamp(coordinates.Max(x => x.X), 0, imageWidth);
-                    var minY = Math.Clamp(coordinates.Min(x => x.Y), 0, imageHeight);
-                    var maxY = Math.Clamp(coordinates.Max(x => x.Y), 0, imageHeight);
-                    if (maxX <= minX || maxY <= minY) continue;
+                    var line = annotationType switch
+                    {
+                        YoloAnnotationType.ObjectDetection => CreateDetectionLine(classId, coordinates, imageWidth, imageHeight),
+                        YoloAnnotationType.SemanticSegmentation => CreateSegmentationLine(shape, classId, coordinates, imageWidth, imageHeight),
+                        _ => throw new ArgumentOutOfRangeException(nameof(annotationType), annotationType, null)
+                    };
+                    if (line is null) continue;
 
-                    var centerX = (minX + maxX) / 2 / imageWidth;
-                    var centerY = (minY + maxY) / 2 / imageHeight;
-                    var width = (maxX - minX) / imageWidth;
-                    var height = (maxY - minY) / imageHeight;
-                    lines.Add(string.Create(CultureInfo.InvariantCulture,
-                        $"{classId} {centerX:0.######} {centerY:0.######} {width:0.######} {height:0.######}"));
+                    lines.Add(line);
                     result.ConvertedAnnotationCount++;
                     result.CategoryCounts[label] = result.CategoryCounts.GetValueOrDefault(label) + 1;
                 }
@@ -86,6 +85,16 @@ public sealed class LabelMeToYoloConverter
                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
                 await File.WriteAllLinesAsync(outputPath, lines, new UTF8Encoding(false), cancellationToken);
                 result.OutputFileCount++;
+                if (checkEmptyLabels && lines.Count == 0)
+                {
+                    result.EmptyLabelFileCount++;
+                    result.EmptyLabelPaths.Add(outputPath);
+                    if (deleteEmptyLabels)
+                    {
+                        File.Delete(outputPath);
+                        result.DeletedEmptyLabelFileCount++;
+                    }
+                }
             }
             catch (JsonException)
             {
@@ -107,11 +116,74 @@ public sealed class LabelMeToYoloConverter
         return result;
     }
 
+    private static string? CreateDetectionLine(
+        int classId,
+        IReadOnlyCollection<(double X, double Y)> coordinates,
+        double imageWidth,
+        double imageHeight)
+    {
+        if (coordinates.Count < 2) return null;
+        var minX = Math.Clamp(coordinates.Min(x => x.X), 0, imageWidth);
+        var maxX = Math.Clamp(coordinates.Max(x => x.X), 0, imageWidth);
+        var minY = Math.Clamp(coordinates.Min(x => x.Y), 0, imageHeight);
+        var maxY = Math.Clamp(coordinates.Max(x => x.Y), 0, imageHeight);
+        if (maxX <= minX || maxY <= minY) return null;
+
+        var centerX = (minX + maxX) / 2 / imageWidth;
+        var centerY = (minY + maxY) / 2 / imageHeight;
+        var width = (maxX - minX) / imageWidth;
+        var height = (maxY - minY) / imageHeight;
+        return string.Create(CultureInfo.InvariantCulture,
+            $"{classId} {centerX:0.######} {centerY:0.######} {width:0.######} {height:0.######}");
+    }
+
+    private static string? CreateSegmentationLine(
+        JsonElement shape,
+        int classId,
+        IReadOnlyCollection<(double X, double Y)> coordinates,
+        double imageWidth,
+        double imageHeight)
+    {
+        if (coordinates.Count < 2) return null;
+        var points = coordinates.ToList();
+        if (shape.TryGetProperty("shape_type", out var shapeTypeElement)
+            && string.Equals(shapeTypeElement.GetString(), "rectangle", StringComparison.OrdinalIgnoreCase))
+        {
+            var minX = coordinates.Min(x => x.X);
+            var maxX = coordinates.Max(x => x.X);
+            var minY = coordinates.Min(x => x.Y);
+            var maxY = coordinates.Max(x => x.Y);
+            points = [(minX, minY), (maxX, minY), (maxX, maxY), (minX, maxY)];
+        }
+
+        var normalized = points
+            .Select(point => (
+                X: Math.Clamp(point.X, 0, imageWidth) / imageWidth,
+                Y: Math.Clamp(point.Y, 0, imageHeight) / imageHeight))
+            .Distinct()
+            .ToList();
+        if (normalized.Count >= 2 && normalized[0] == normalized[^1]) normalized.RemoveAt(normalized.Count - 1);
+        if (normalized.Count < 3) return null;
+
+        var values = normalized.SelectMany(point => new[]
+        {
+            point.X.ToString("0.######", CultureInfo.InvariantCulture),
+            point.Y.ToString("0.######", CultureInfo.InvariantCulture)
+        });
+        return $"{classId} {string.Join(' ', values)}";
+    }
+
     private static bool TryGetPositiveNumber(JsonElement root, string name, out double value)
     {
         value = 0;
         return root.TryGetProperty(name, out var element) && element.TryGetDouble(out value) && value > 0;
     }
+}
+
+public enum YoloAnnotationType
+{
+    ObjectDetection,
+    SemanticSegmentation
 }
 
 public sealed class YoloConversionResult
@@ -120,6 +192,9 @@ public sealed class YoloConversionResult
     public int OutputFileCount { get; set; }
     public int ConvertedAnnotationCount { get; set; }
     public int InvalidFileCount { get; set; }
+    public int EmptyLabelFileCount { get; set; }
+    public int DeletedEmptyLabelFileCount { get; set; }
+    public List<string> EmptyLabelPaths { get; set; } = [];
     public List<string> Categories { get; set; } = [];
     public Dictionary<string, int> CategoryCounts { get; set; } = new(StringComparer.Ordinal);
 }
