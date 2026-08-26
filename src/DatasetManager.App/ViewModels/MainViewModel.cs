@@ -309,12 +309,16 @@ public sealed class MainViewModel : ObservableObject
         if (SelectedDataset is null) return;
         var model = SelectedDataset.Model;
         var children = _models.Count(x => x.ParentDatasetId == model.Id);
-        var deletesFiles = model.Type == DatasetType.Created && model.Materialization?.OwnsRootDirectory == true;
+        var ownsRootDirectory = model.Type == DatasetType.Created && model.Materialization?.OwnsRootDirectory == true;
+        var rootDirectoryExists = Directory.Exists(model.RootPath);
+        var deletesFiles = ownsRootDirectory && rootDirectoryExists;
         var suffix = children > 0 ? $"\n\n有 {children} 个派生数据集会解除源数据集关联。" : string.Empty;
         var message = deletesFiles
             ? $"将永久删除“{model.Name}”的实际数据集目录和管理记录：\n\n{model.RootPath}\n\n来源文件和来源清单不会删除。此操作不可恢复。"
+            : ownsRootDirectory
+                ? $"“{model.Name}”的实际数据集目录已不存在：\n\n{model.RootPath}\n\n将只删除管理记录。{suffix}"
             : $"只删除“{model.Name}”的管理记录，不会删除磁盘文件。{suffix}";
-        if (MessageBox.Show(message, deletesFiles ? "确认删除实际数据集" : "确认移除",
+        if (MessageBox.Show(message, deletesFiles ? "确认删除实际数据集" : "确认移除记录",
                 MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
 
         if (deletesFiles)
@@ -338,7 +342,9 @@ public sealed class MainViewModel : ObservableObject
         await SaveAsync();
         StatusText = deletesFiles
             ? $"已删除 {model.Name} 的实际数据集和管理记录"
-            : $"已移除 {model.Name} 的管理记录";
+            : ownsRootDirectory
+                ? $"实际目录已不存在，已移除 {model.Name} 的管理记录"
+                : $"已移除 {model.Name} 的管理记录";
     }
 
     private async Task RefreshSelectedAsync()

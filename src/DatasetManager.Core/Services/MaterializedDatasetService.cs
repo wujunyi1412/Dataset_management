@@ -134,6 +134,7 @@ public sealed class MaterializedDatasetService
         if (string.IsNullOrWhiteSpace(root) || target.TrimEnd(Path.DirectorySeparatorChar).Equals(root.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("目标路径过于宽泛，拒绝删除。");
         if (Directory.GetParent(target) is null) throw new InvalidOperationException("无法确认目标目录的父目录，拒绝删除。");
+        if (!Directory.Exists(target)) return;
         var markerPath = Path.Combine(target, OwnershipMarkerFileName);
         if (!File.Exists(markerPath)) throw new InvalidOperationException("目标目录缺少工具所有权标记，拒绝删除实际文件。");
         OwnershipMarker? marker;
