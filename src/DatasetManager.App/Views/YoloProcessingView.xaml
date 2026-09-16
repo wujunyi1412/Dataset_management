@@ -85,7 +85,12 @@
             <Border Grid.Column="2" Background="White" CornerRadius="8" Padding="18">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-                        <TextBlock Text="操作记录" FontSize="18" FontWeight="SemiBold"/>
+                        <DockPanel>
+                            <Button x:Name="ClearOperationRecordsButton" DockPanel.Dock="Right" Content="清空全部"
+                                    Click="ClearOperationRecords_Click" Foreground="#B91C1C" Padding="8,4"
+                                    Visibility="Collapsed"/>
+                            <TextBlock Text="操作记录" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </DockPanel>
                         <TextBlock Text="格式转换和重复检查完成后会自动记录在这里" Foreground="#6B7280" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
                     </StackPanel>
                     <Grid>
@@ -103,7 +108,11 @@
                                     <TextBlock Text="{Binding SourcePathB}" Foreground="#6B7280" FontSize="11" TextWrapping="Wrap"/>
                                     <TextBlock Text="{Binding OutputPath}" Foreground="#2563EB" FontSize="11" TextWrapping="Wrap"/>
                                     <TextBlock Text="{Binding Notes}" Foreground="#6B7280" TextWrapping="Wrap" Margin="0,3,0,0"/>
-                                    <TextBlock Text="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Foreground="#9CA3AF" FontSize="11" Margin="0,3,0,0"/>
+                                    <DockPanel Margin="0,5,0,0">
+                                        <Button DockPanel.Dock="Right" Content="删除记录" Click="DeleteOperationRecord_Click"
+                                                Foreground="#B91C1C" FontSize="11" Padding="6,2"/>
+                                        <TextBlock Text="{Binding CreatedAt, StringFormat={}{0:yyyy-MM-dd HH:mm}}" Foreground="#9CA3AF" FontSize="11" VerticalAlignment="Center"/>
+                                    </DockPanel>
                                 </StackPanel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>

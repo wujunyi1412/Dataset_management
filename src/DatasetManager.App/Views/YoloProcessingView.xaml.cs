@@ -167,9 +167,55 @@ public partial class YoloProcessingView : UserControl
         UpdateRecordsEmptyState();
     }
 
+    private async void DeleteOperationRecord_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: YoloOperationRecord record }) return;
+        if (MessageBox.Show(
+                $"删除操作记录“{record.Title}”？\n\n只删除这条记录，不会删除转换后的标签或其他磁盘文件。",
+                "确认删除记录", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
+
+        var index = OperationRecords.IndexOf(record);
+        if (index < 0) return;
+        OperationRecords.RemoveAt(index);
+        UpdateRecordsEmptyState();
+        try
+        {
+            await _repository.SaveAsync(OperationRecords);
+        }
+        catch (Exception exception)
+        {
+            OperationRecords.Insert(Math.Min(index, OperationRecords.Count), record);
+            UpdateRecordsEmptyState();
+            MessageBox.Show(exception.Message, "删除操作记录失败", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async void ClearOperationRecords_Click(object sender, RoutedEventArgs e)
+    {
+        if (OperationRecords.Count == 0) return;
+        if (MessageBox.Show(
+                $"清空全部 {OperationRecords.Count} 条 YOLO 操作记录？\n\n只删除操作记录，不会删除转换后的标签或其他磁盘文件。",
+                "确认清空操作记录", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
+
+        var backup = OperationRecords.ToArray();
+        OperationRecords.Clear();
+        UpdateRecordsEmptyState();
+        try
+        {
+            await _repository.SaveAsync(OperationRecords);
+        }
+        catch (Exception exception)
+        {
+            foreach (var record in backup) OperationRecords.Add(record);
+            UpdateRecordsEmptyState();
+            MessageBox.Show(exception.Message, "清空操作记录失败", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private void UpdateRecordsEmptyState()
     {
         EmptyRecordsText.Visibility = OperationRecords.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         OperationRecordsList.Visibility = OperationRecords.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+        ClearOperationRecordsButton.Visibility = OperationRecords.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
     }
 }
