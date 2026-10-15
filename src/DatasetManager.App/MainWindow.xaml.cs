@@ -34,6 +34,12 @@ public partial class MainWindow : Window
         WeightNavigation.IsChecked = true;
         ViewModel.SetWeightModule();
     }
+    private void SoftwareUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        ClearNavigationSelection();
+        SoftwareUpdateNavigation.IsChecked = true;
+        ViewModel.SetSoftwareUpdateModule();
+    }
 
     private void SelectNavigation(DatasetType? type, ToggleButton selected)
     {
@@ -53,5 +59,6 @@ public partial class MainWindow : Window
         ValidationNavigation.IsChecked = false;
         YoloNavigation.IsChecked = false;
         WeightNavigation.IsChecked = false;
+        SoftwareUpdateNavigation.IsChecked = false;
     }
 }

@@ -3,6 +3,7 @@ setlocal
 cd /d "%~dp0"
 
 set "OPENCV_DIR=D:\opencv-4.5.3\opencv-4.5.3\build\install"
+set "BUILD_DIR=%~dp0build-release"
 
 echo [1/3] Checking build tools...
 where cmake >nul 2>nul
@@ -13,11 +14,11 @@ if not exist "%OPENCV_DIR%\include" goto :opencv_missing
 if not exist "%OPENCV_DIR%\bin\opencv_core453.dll" goto :opencv_missing
 
 echo [2/3] Configuring Visual Studio 2022 x64 build...
-cmake -S . -B .\build -G "Visual Studio 17 2022" -A x64 -DOPENCV_INSTALL_DIR="%OPENCV_DIR%"
+cmake -S . -B "%BUILD_DIR%" -G "Visual Studio 17 2022" -A x64 -DOPENCV_INSTALL_DIR="%OPENCV_DIR%"
 if errorlevel 1 goto :failed
 
 echo [3/3] Building Release...
-cmake --build .\build --config Release
+cmake --build "%BUILD_DIR%" --config Release
 if errorlevel 1 goto :failed
 
 echo.

@@ -3,6 +3,7 @@ setlocal
 cd /d "%~dp0"
 
 set "OPENCV_DIR=D:\opencv-4.5.3\opencv-4.5.3\build\install"
+set "BUILD_DIR=%~dp0build-release"
 set "OUTPUT_DIR=%~dp0bin\Standalone"
 set "STAGING_DIR=%~dp0bin\Standalone-publish"
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -28,11 +29,11 @@ if not defined VC_REDIST_DIR goto :redist_missing
 if not exist "%VC_REDIST_DIR%\vcruntime140.dll" goto :redist_missing
 
 echo [2/7] Configuring native x64 Release build...
-cmake -S . -B .\build -G "Visual Studio 17 2022" -A x64 -DOPENCV_INSTALL_DIR="%OPENCV_DIR%"
+cmake -S . -B "%BUILD_DIR%" -G "Visual Studio 17 2022" -A x64 -DOPENCV_INSTALL_DIR="%OPENCV_DIR%"
 if errorlevel 1 goto :failed
 
 echo [3/7] Building C++ and WPF projects...
-cmake --build .\build --config Release
+cmake --build "%BUILD_DIR%" --config Release
 if errorlevel 1 goto :failed
 
 echo [4/7] Publishing self-contained Windows x64 application...

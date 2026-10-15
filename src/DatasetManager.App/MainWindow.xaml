@@ -57,6 +57,9 @@
                     <ToggleButton x:Name="WeightNavigation" Style="{StaticResource NavigationToggleStyle}" Click="Weight_Click">
                         <TextBlock Text="权重记录"/>
                     </ToggleButton>
+                    <ToggleButton x:Name="SoftwareUpdateNavigation" Style="{StaticResource NavigationToggleStyle}" Click="SoftwareUpdate_Click">
+                        <TextBlock Text="软件更新记录"/>
+                    </ToggleButton>
                     <Border Height="1" Background="#374151" Margin="0,16,0,14"/>
                     <TextBlock Text="数据集划分" Foreground="#93C5FD" FontSize="11" FontWeight="Bold" Margin="4,0,0,5"/>
                     <ToggleButton x:Name="TrainingNavigation" Style="{StaticResource NavigationToggleStyle}" Click="Training_Click">
@@ -324,6 +327,19 @@
                 </Style>
             </views:WeightRecordsView.Style>
         </views:WeightRecordsView>
+
+        <views:SoftwareUpdatesView Grid.Column="1" Grid.Row="0">
+            <views:SoftwareUpdatesView.Style>
+                <Style TargetType="views:SoftwareUpdatesView">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding DataContext.IsSoftwareUpdateModule, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                            <Setter Property="Visibility" Value="Visible"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </views:SoftwareUpdatesView.Style>
+        </views:SoftwareUpdatesView>
 
         <Border Grid.Column="1" Grid.Row="1" Background="#E5E7EB" Padding="10,5">
             <DockPanel>

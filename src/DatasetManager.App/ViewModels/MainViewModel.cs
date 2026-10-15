@@ -30,6 +30,7 @@ public sealed class MainViewModel : ObservableObject
     private string _statusText = "正在载入…";
     private bool _isYoloModule;
     private bool _isWeightModule;
+    private bool _isSoftwareUpdateModule;
 
     public MainViewModel()
     {
@@ -65,7 +66,8 @@ public sealed class MainViewModel : ObservableObject
     public string NativeStatus { get; } = new NativeImageService().GetNativeVersion();
     public bool IsYoloModule => _isYoloModule;
     public bool IsWeightModule => _isWeightModule;
-    public bool IsDatasetModule => !_isYoloModule && !_isWeightModule;
+    public bool IsSoftwareUpdateModule => _isSoftwareUpdateModule;
+    public bool IsDatasetModule => !_isYoloModule && !_isWeightModule && !_isSoftwareUpdateModule;
 
     public DatasetItemViewModel? SelectedDataset
     {
@@ -145,8 +147,10 @@ public sealed class MainViewModel : ObservableObject
     {
         _isYoloModule = false;
         _isWeightModule = false;
+        _isSoftwareUpdateModule = false;
         RaisePropertyChanged(nameof(IsYoloModule));
         RaisePropertyChanged(nameof(IsWeightModule));
+        RaisePropertyChanged(nameof(IsSoftwareUpdateModule));
         RaisePropertyChanged(nameof(IsDatasetModule));
         _filterType = type;
         ApplyDatasetSort();
@@ -171,8 +175,10 @@ public sealed class MainViewModel : ObservableObject
     {
         _isYoloModule = true;
         _isWeightModule = false;
+        _isSoftwareUpdateModule = false;
         RaisePropertyChanged(nameof(IsYoloModule));
         RaisePropertyChanged(nameof(IsWeightModule));
+        RaisePropertyChanged(nameof(IsSoftwareUpdateModule));
         RaisePropertyChanged(nameof(IsDatasetModule));
         StatusText = "YOLO处理";
     }
@@ -181,10 +187,24 @@ public sealed class MainViewModel : ObservableObject
     {
         _isYoloModule = false;
         _isWeightModule = true;
+        _isSoftwareUpdateModule = false;
         RaisePropertyChanged(nameof(IsYoloModule));
         RaisePropertyChanged(nameof(IsWeightModule));
+        RaisePropertyChanged(nameof(IsSoftwareUpdateModule));
         RaisePropertyChanged(nameof(IsDatasetModule));
         StatusText = "权重记录";
+    }
+
+    public void SetSoftwareUpdateModule()
+    {
+        _isYoloModule = false;
+        _isWeightModule = false;
+        _isSoftwareUpdateModule = true;
+        RaisePropertyChanged(nameof(IsYoloModule));
+        RaisePropertyChanged(nameof(IsWeightModule));
+        RaisePropertyChanged(nameof(IsSoftwareUpdateModule));
+        RaisePropertyChanged(nameof(IsDatasetModule));
+        StatusText = "软件更新记录";
     }
 
     private async Task LoadAsync()
